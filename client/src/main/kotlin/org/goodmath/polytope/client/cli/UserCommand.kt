@@ -30,7 +30,6 @@ import org.goodmath.polytope.common.stashable.Action
 
 class UserCmd: PolytopeCommandBase(name="user", help="work with users") {
     override fun run() {
-
     }
 
     companion object {

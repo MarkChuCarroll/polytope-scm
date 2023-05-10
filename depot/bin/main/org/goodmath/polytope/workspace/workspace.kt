@@ -333,6 +333,15 @@ class Workspace(
         setBasis(basis)
     }
 
+    suspend fun createChange(name: String, description: String) {
+        TODO()
+    }
+
+    suspend fun openHistory(name: String) {
+
+    }
+
+    
     /**
      * Populate the workspace from a basis point. Most of the time, this should
      * be a history version.

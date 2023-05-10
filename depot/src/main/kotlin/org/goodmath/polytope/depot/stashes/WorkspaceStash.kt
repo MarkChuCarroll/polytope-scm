@@ -289,6 +289,24 @@ class WorkspaceStash(
         return ch
     }
 
+    fun openHistory(
+            auth: AuthenticatedUser,
+            ws: Workspace,
+            history: String): Workspace {
+        depot.users.validatePermissions(auth, Action.writeProject(ws.project))
+        if (ws.modifiedArtifacts.isNotEmpty()) {
+            throw PtException(
+                    PtException.Kind.UserError,
+                    "A new history can't be opened in a workspace with unsaved changes"
+            )
+        }
+        ws.history = history
+        ws.change = null
+        val basis = ProjectVersionSpecifier.history(ws.project, history)
+        setBasis(auth, ws, basis)
+        return ws
+    }
+
 
     /**
      * Configure and populate the workspace for an existing in-progress change.
@@ -310,6 +328,8 @@ class WorkspaceStash(
                 "A new change can't be opened in a workspace with unsaved changes"
             )
         }
+        ws.change = null
+        ws.history = history
         val basis = ProjectVersionSpecifier.change(ws.project, history, changeName)
         setBasis(auth, ws, basis)
     }
@@ -1029,4 +1049,5 @@ class WorkspaceStash(
         System.err.println("Abandon change to $ws because $reason")
         TODO()
     }
+
 }

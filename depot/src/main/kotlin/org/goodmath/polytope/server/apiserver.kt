@@ -318,6 +318,17 @@ fun Application.configureRouting() {
                     }
                 }
 
+                post("projects/{project}/workspaces/{workspace}/action/openHistory/{history}") {
+                    callWithAuthAndResultHandling(call, depot) { auth, depot, call ->
+                        val project = call.parameters["project"]!!
+                        val workspace = call.parameters["workspace"]!!
+                        val history = call.parameters["history"]!!
+                        val ws = depot.workspaces.retrieveWorkspace(auth, project, workspace)
+                        depot.workspaces.openHistory(auth, ws, history)
+                        ws
+                    }
+                }
+
                 get("projects/{project}/workspaces/{workspace}/paths") {
                     callWithAuthAndResultHandling(call, depot) { auth, depot, call ->
                         val project = call.parameters["project"]!!

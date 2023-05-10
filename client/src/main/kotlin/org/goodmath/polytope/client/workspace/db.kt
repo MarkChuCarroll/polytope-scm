@@ -77,6 +77,13 @@ fun<T> RocksDB.updateTyped(cf: ColumnFamilyHandle, key: String, value: T) {
     this.write(WriteOptions(), wb)
 }
 
+fun<T> RocksDB.updateTyped(key: String, value: T) {
+    val wb = WriteBatch()
+    wb.delete(key.toByteArray())
+    wb.putTyped(key, value)
+    this.write(WriteOptions(), wb)
+}
+
 /**
  * For clean updates, this is a helper that lets you use putTyped
  * in a batch.
@@ -84,6 +91,11 @@ fun<T> RocksDB.updateTyped(cf: ColumnFamilyHandle, key: String, value: T) {
 fun<T> WriteBatch.putTyped(cf: ColumnFamilyHandle, key: String, value: T) {
     this.put(cf, key.toByteArray(UTF_8), ParsingCommons.klaxon.toJsonString(value).toByteArray(UTF_8))
 }
+
+fun<T> WriteBatch.putTyped(key: String, value: T) {
+    this.put(key.toByteArray(UTF_8), ParsingCommons.klaxon.toJsonString(value).toByteArray(UTF_8))
+}
+
 
 /**
  * The counterpart to typed get. This will read a json string from

@@ -88,6 +88,10 @@ class RestApiClient(
         }
     }
 
+    fun close() {
+        client.close()
+    }
+
     /**
      * A convenience wrapper, which runs an HTTP request, and unpacks the response,
      * turning 2xxs into return values, and throwing an appropriate exception for
@@ -365,7 +369,7 @@ class RestApiClient(
         }
     }
 
-    suspend fun changesList(project: String, history: String, change: String): Change {
+    suspend fun changeGet(project: String, history: String, change: String): Change {
         return runWithErrorHandling {
             client.get(serverUrl) {
                 headers {
@@ -467,6 +471,20 @@ class RestApiClient(
             }
         }
     }
+
+    suspend fun workspaceOpenChange(project: String, name: String): Workspace {
+        return runWithErrorHandling {
+            client.post(serverUrl) {
+                headers {
+                    contentType(ContentType.Application.Json)
+                }
+                url {
+                    appendPathSegments("projects", project, "workspaces", name, "action", "openChange", name)
+                }
+            }
+        }
+    }
+
 
     suspend fun workspaceListPaths(project: String, name: String): List<String> {
         return runWithErrorHandling {
