@@ -1,5 +1,12 @@
 # Polytope: Version Control Done Right for the Modern Programmer
 
+## Documentation Index
+
+* [User manual](./docs/usermanual.md)
+* [User model](./docs/usermodel.md) _(Note: this is currently out of
+  date, and in need of revision)_
+
+
 ## Motivation
 
 <img style="float: right" src="docs/240px-Tesseract-1K.gif" title="tesseract" alt="A 4 dimensional cube rotating in 3 dimensions."/> 

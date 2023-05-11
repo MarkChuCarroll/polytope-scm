@@ -341,7 +341,7 @@ class Workspace(
 
     }
 
-    
+
     /**
      * Populate the workspace from a basis point. Most of the time, this should
      * be a history version.

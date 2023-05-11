@@ -42,7 +42,7 @@ class CreateChangeCommand: PolytopeCommandBase("create", help="create a change i
     }
 
 }
-class OpenChangeCommand: PolytopeCommandBase("create", help="create a change in this workspace") {
+class OpenChangeCommand: PolytopeCommandBase("open", help="open a change in this workspace") {
     val name: String by option("--name", help="The name of the existing change").required()
     val history: String? by option("-h", "--history", help="The name of the history containing the change")
 
@@ -57,7 +57,7 @@ class OpenChangeCommand: PolytopeCommandBase("create", help="create a change in 
 class ListChangesCommand: PolytopeCommandBase("list", "list changes open in a history") {
     val project: String? by option("--project", help="The project containing the history")
     val history: String? by option("--history", help="The history containing the change")
-
+// TODO: this needs to be able to select between all changes and open changes.
     override fun run() {
         echo("list changes")
     }

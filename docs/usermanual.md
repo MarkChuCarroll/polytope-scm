@@ -11,13 +11,22 @@ specifically to support hierarchical workflows. What does that mean
 in practice?
 
 - Users work on projects.
-- Within projects, there's a primary version of the project in a history
-  called "main". As the project evolves, main will continually change
-  to represent the current version of the project.
+- Changes to projects are organized into histories. A history is a
+  linear sequence of versions of the project. Each step in the history
+  is a change.
+- There can be many histories in a project. Each one has an independent
+  sequence of changes.
+- In normal operation, users will work in one history.
+- In the most common mode of operation, there's one history which is
+  the target of development, called _main_.
+- Within projects, there's a primary version of the project in a
+  history called "main". As the project evolves, main will continually
+  change to represent the current version of the project.
 - There can be other histories, which are derived from a _basis_ in
   some other history.
   - histories form a tree: main is the root; more histories can branch
-    from main; and still more histories can branch from those, and so on.
+    from main; and still more histories can branch from those, and so
+    on.
 - Users work by making changes to a history. They don't change a
   history directly; they create a _change_, where they work on their
   changes to a history. When they're done, they can _deliver_ their
@@ -28,20 +37,21 @@ in practice?
     Each of these states is called a _savepoint_. The change is the
     sum of all of the savepoints.
 - Changes can flow between histories, but it's expected that the
-  primary flow directions follow the stream hierarchy. (So the most
+  primary flow directions follow the history hierarchy. (So the most
   common flow is: change is made in a history; that gets sent to the
-  stream's parent, and so on until it reaches the root.) Sibling histories
-  _can_ sync changes between them, but the normal (and so most fully
-  supported by the system) way for histories to share changes will
-  be for one to send changes to its parent history, and then the
-  sibling will accept those changes from their common ancestor.
+  stream's parent, and so on until it reaches the root.) Sibling
+  histories _can_ sync changes between them, but the normal (and so
+  most fully supported by the system) way for histories to share
+  changes will be for one to send changes to its parent history, and
+  then the sibling will accept those changes from their common
+  ancestor.
 
 ## The Command Line
 
-The primary (initial) interface for working with Polytope will
-be a command line tool. At first, it's going to be very manual -
-you'll need to deliberately tell the systems about things like
-renaming files. (Eventually, I hope to be able to provide a FUSE based
+The primary (initial) interface for working with Polytope will be a
+command line tool. At first, it's going to be very manual - you'll
+need to deliberately tell the systems about things like renaming
+files. (Eventually, I hope to be able to provide a FUSE based
 interface, so that things like that can be done automatically.)
 
 The command-line tool creates a local copy of the project called
@@ -63,147 +73,166 @@ Or to rename a file in the workspace:
 
 The supported nouns are:
 
-- project: the top-level construct. Everything is done relative
-  to a project.
-- history: a long-lived named sequence of project versions.
-- change: a short-lived space where a user works on changes
-  that will eventually be delivered into a history.
-- file
-- user
+- Project
+- History
+- Change
+- Workspace
+- User
+
 
 ### Verbs for project
 
-#### Project Create
+#### Create a new project
 
 > pt project create _projectname_
 
 _create_ creates a new project.
 
-#### Project List Streams
+#### List projects
 
-> pt project list-streams
+> pt project list
 
-#### Set the selected project
+List the projects available on the server.
 
-> pt project select _projectname_
+#### Show a specific project
 
-Sets the project for the current workspace.
+> pt project get _projectname_
 
-#### Show the selected project
+### Verbs for History
 
-> pt project show
+#### List histories
 
-### Verbs for Streams
+> pt history liste --project=_projectname_
 
-#### Create Stream
+#### Create a new history
 
-> pt stream create _stream-name_ _[--from=\_stream@version_]\_
+> pt history create --project=_projectname_ --from-history=_source_history [ --from-history-version=_index_] _new_history_name
 
-(If the "from" parameter is omitted, then it defaults to main@current.)
+#### View the versions in a history
 
-#### Show Stream History
+> pt history versions --project=_projectname_ --history=_history_name_
 
-> pt stream show-history _streamname_
+### Verbs for Change
 
-#### Set the selected (default) stream for this workspace
+#### Create a new change
 
-> pt stream select _stream-name_
+> pt change create --project=_projectname_ [--history=_historyname_] --name=_nem_change_name
 
-The _selected_ stream is the stream that you'll be creating your changesets from.
+If the command is run in a workspace, and the parent history isn't
+supplied, then it will default to the current history open in the workspace. 
+If it's not run in a workspace, then it's an error to ommit 
 
-#### Show the selected stream for this workspace.
 
-> pt stream show
+#### Open an existing change in a workspace
 
-### Verbs for Changesets
+**Note**: This command can only be run inside of a workspace.
 
-#### Create a changeset
+> p change open --name=change_name [--history=_history_name_]
 
-> pt changeset create _name_ _[--from=stream-name@version]_ _[--description="text"]_
+If the history name is omitted, then the current history open in the
+workspace will be used.
 
-Create a changeset. By default, the changeset will be created from the latest version
-of the selected stream.
+#### List changes in a history
 
-#### Save the current state of a changeset.
+> pt changes list [--project=_project_name_] [--history=_histore_name] --status=(OPEN|ALL)
 
-> pt changeset save _[--description=...]_
+If the command is run in a workspace, and the project and/or parent
+history isn't supplied, then it will default to the current project/history
+open in the workspace.  If it's not run in a workspace, then it's an
+error to ommit
 
-#### Update a changeset to include pending changes from its parent
+#### View a change
 
-> pt changeset update
+> pt change get [--project=_project_name_] [--history=_history_name] --change=change_name
 
-#### Merge changes from another changeset into this one
 
-> pt changeset merge _changeset_id_
+#### List the save points within a change
 
-#### Deliver changes to the parent stream
+> pt change saves [--project=_project_name_] [--history=_history_name] --change=change_name
 
-> pt changeset deliver
 
-### Verbs for files
 
-Eventually, most of these commands shouldn't be needed; we can automate them via
-either fuse, or some kind of filesystem watcher.
+#### Deliver a change to its history
 
-#### Ignore a file
+**Note**: This command can only be run inside of a workspace. It will use the project, history, and change open in the current workspace.
 
-This command tells polytope to ignore the file. It won't attempt to track
-changes to it, or include it in changesets.
+> pt change deliver
 
-> pt file ignore _paths_
+#### Integrate a change from a different history
 
-#### Rename a file
+**Note**: This command can only be run inside of a workspace.
 
-> pt file rename _oldpath_ _newpath_
+> pt change integrate --history=_history_name --change=_change_name_
+
+### Workspace Commands
+
+#### List Workspaces in a project
+
+> pt ws list --project=_project_ [--history=_history_]
+
+#### View information about a workspace
+
+> pt ws get --project=_project_ --ws=_ws_name_
+
+#### Create a new workspace
+
+> pt ws create --project=_project_ --ws=_new_ws_name [--location=path]
+
+Creates a new workspace, with a client in the local filesystem
+at the specified path. The workspace will initially be opened in
+the current version of the _main_ history.
+
+#### Open an existing workspace in the client
+
+> pt ws open --project=_project_ --ws=_ws_ --location=path
+
+Creates a new client for a workspace in the local filesystem.
+
+#### Save the changes in a workspace as a changestep
+
+> pt ws save --description="A description of the change" (--resolve=conflict-id)*
+
+save the current state of the workspace in a savepoint, resolving any 
+conflicts listed.
+
+#### Update the workspace to include new changes in a history
+
+> pt ws update 
+
+#### Delete a workspace
+
+> pt ws delete --project=_project --ws=_workspace_name_
+
+Note that this doesn't just delete a local copy of a workspace (you
+can do that by just `rm`ing it in the shell; this deletes the workspace
+from the server, so that it can never be opened in another client.
+
+
+#### Abandon changes in a workspace
+
+> pt ws abandon --resean="desrciption of reason for abandoning" [--savepoint=_sp]
+
+This abandons the currently unsaved changes in the workspace,
+reverting to the state at the specified savepoint (or, if the saevpoint
+isn't provided, to the most recent savepoint in the workspace's open change.)
+
+
+### Verbs on File
+
+#### Add a new file
+
+> pt file add path...
+
+#### Move/rename a file
+
+> pt file mv old-path... new-path
 
 #### Delete a file
 
-> pt file remove _path_
+> pt file rm path...
 
-(This isn't strictly necessary; if you just delete a file, we'll notice,
-and mark it deleted.)
+#### List the managed files in a workspace
 
-#### Add a file
+> pt file list 
 
-> pt file add _path_
 
-(There'll be a configuration option around this; if you want, we can automatically
-add any new files that you don't specifically flag with "ignore".)
-
-#### Show file history
-
-> pt file show-history _path_...
-
-#### Show a files identifier
-
-> pt file id _path_...
-
-Shows the internal identifier for the file and its current version.
-
-#### Show file changes.
-
-> pt file diff _path_ \_[--relative-to=version_spec]
-
-The version spec here can be one of:
-
-- `stream@version` (the version from the specified stream)
-- `-number` (a version _count_ levels back in the version history of the file.)
-- `$versionid` a specific version ID.
-
-### Commands for administering users.
-
-#### Add a new user
-
-> pt user add _username_ [--permissions=perm1,perm2,...]
-
-#### Grant new permissions to a user
-
-> pt user grant _username_ [--permissions=perm1,perm2,...]
-
-#### Revoke permissions from a user
-
-> pt user revoke _username_ [--permissions=perm1,perm2,...]
-
-#### List users
-
-> pt user list [--permissions]
