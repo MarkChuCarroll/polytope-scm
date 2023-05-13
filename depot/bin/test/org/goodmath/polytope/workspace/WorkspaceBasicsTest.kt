@@ -17,11 +17,10 @@
 package org.goodmath.polytope.workspace
 
 import org.goodmath.polytope.TestStub
-import org.goodmath.polytope.depot.agents.Directory
-import org.goodmath.polytope.depot.agents.DirectoryAgent
-import org.goodmath.polytope.depot.agents.text.Text
-import org.goodmath.polytope.depot.agents.text.TextAgent
-import org.goodmath.polytope.depot.util.ParsingCommons
+import org.goodmath.polytope.common.agents.Directory
+import org.goodmath.polytope.common.agents.DirectoryAgent
+import org.goodmath.polytope.common.agents.text.Text
+import org.goodmath.polytope.common.agents.text.TextAgent
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.assertContains
@@ -35,7 +34,7 @@ class WorkspaceBasicsTest: TestStub() {
         depot.projects.createProject(user, "test", "a test project")
         assertDoesNotThrow {
             val ws = depot.workspaces.createWorkspace(
-                user, "test", "mytest", "main",
+                user, "test",  "main", "mytest",
                 "a test workspace"
             )
             assertEquals(ws.name, "mytest")
@@ -46,20 +45,20 @@ class WorkspaceBasicsTest: TestStub() {
     fun `it should be able to create and save files in a workspace`() {
         val project = depot.projects.createProject(user, "test", "a test project")
         val ws = depot.workspaces.createWorkspace(
-            user, "test", "mytest", "main",
+            user, "test", "main", "mytest",
             "a test workspace"
         )
-        val ch = ws.createChange(user, "test-change", "just a test")
-        val newFileId = ws.addFile("foo", TextAgent.artifactType, TextAgent.encodeToString(Text(listOf("11\n", "22\n", "33\n"))))
-        val sp = ws.save("test", emptyList())
+        val ch = depot.workspaces.createChange(user, ws,"test-change", "just a test")
+        val newFileId = depot.workspaces.addFile(user, ws, "foo", TextAgent.artifactType, TextAgent.encodeToString(Text(listOf("11\n", "22\n", "33\n"))))
+        val sp = depot.workspaces.save(user, ws,"test", emptyList())
 
-        val paths = ws.listPaths()
+        val paths = depot.workspaces.listPaths(user, ws)
         assertEquals(setOf("", "foo"), paths.toSet())
         val rsp = depot.changes.retrieveSavePoint(user, project.name,"main", "test-change",
             sp.id)
         assertContains(rsp.modifiedArtifacts, newFileId)
         assertEquals(rsp.changeId, ch.id)
-        val baseline = ws.currentBaseline()
+        val baseline = depot.workspaces.currentBaseline(user, ws)
             assertContentEquals(listOf(newFileId, baseline.rootDir).sorted(), rsp.modifiedArtifacts.sorted())
         val rch = depot.changes.retrieveChangeByName(user, project.name, "main", "test-change")
         assertContains(rch.savePoints, rsp.id)
@@ -69,39 +68,40 @@ class WorkspaceBasicsTest: TestStub() {
     fun `it should be able to handle a directory hierarchy`() {
         depot.projects.createProject(user, "test", "a test project")
         val ws = depot.workspaces.createWorkspace(
-            user, "test", "mytest", "main",
+            user, "test", "main", "mytest",
             "a test workspace"
         )
-        ws.createChange(user, "test-change", "just a test")
-        val dirDir = ws.addFile("dir", DirectoryAgent.artifactType, DirectoryAgent.encodeToString(Directory()))
-        val dirRid = ws.addFile("rid", DirectoryAgent.artifactType, DirectoryAgent.encodeToString(Directory()))
-        ws.addFile("dir/boo", DirectoryAgent.artifactType, DirectoryAgent.encodeToString(Directory()))
-        ws.addFile("dir/boo/text.txt", TextAgent.artifactType, TextAgent.encodeToString(Text(listOf("just some text\t",
+        depot.workspaces.createChange(user, ws,"test-change", "just a test")
+        val dirDir = depot.workspaces.addFile(user, ws,"dir", DirectoryAgent.artifactType, DirectoryAgent.encodeToString(
+            Directory()
+        ))
+        val dirRid = depot.workspaces.addFile(user, ws,"rid", DirectoryAgent.artifactType, DirectoryAgent.encodeToString(Directory()))
+        depot.workspaces.addFile(user, ws,"dir/boo", DirectoryAgent.artifactType, DirectoryAgent.encodeToString(Directory()))
+        depot.workspaces.addFile(user, ws,"dir/boo/text.txt", TextAgent.artifactType, TextAgent.encodeToString(Text(listOf("just some text\t",
             "boring\n",
             "not interesting\n"))))
-        val dull = ws.addFile("rid/blah.txt", TextAgent.artifactType, TextAgent.encodeToString(
+        val dull = depot.workspaces.addFile(user, ws,"rid/blah.txt", TextAgent.artifactType, TextAgent.encodeToString(
             Text(listOf(
                 "I didn't realize\n",
                 "but that last one\n",
                 "was more interesting than this one\n"))))
 
 
-        val sp = ws.save("test", emptyList())
-        val paths = ws.listPaths()
+        val sp = depot.workspaces.save(user, ws,"test", emptyList())
+        val paths = depot.workspaces.listPaths(user, ws)
         assertEquals(setOf("", "dir", "dir/boo", "dir/boo/text.txt", "rid", "rid/blah.txt"), paths.toSet())
-        ws.moveFile("dir/boo", "rid/boo")
+        depot.workspaces.moveFile(user, ws,"dir/boo", "rid/boo")
 
-        val postMovePaths = ws.listPaths()
+        val postMovePaths = depot.workspaces.listPaths(user, ws)
         assertEquals(setOf("", "dir", "rid/boo", "rid/boo/text.txt", "rid", "rid/blah.txt"), postMovePaths.toSet())
 
-        ws.moveFile("rid/blah.txt", "rid/bleh.txt")
-        assertEquals(setOf("", "dir", "rid/boo", "rid/boo/text.txt", "rid", "rid/bleh.txt"), ws.listPaths().toSet())
+        depot.workspaces.moveFile(user, ws,"rid/blah.txt", "rid/bleh.txt")
+        assertEquals(setOf("", "dir", "rid/boo", "rid/boo/text.txt", "rid", "rid/bleh.txt"), depot.workspaces.listPaths(user, ws).toSet())
 
-        ws.deleteFile("rid/bleh.txt")
-        assertEquals(setOf("", "dir", "rid/boo", "rid/boo/text.txt", "rid"), ws.listPaths().toSet())
+        depot.workspaces.deleteFile(user, ws,"rid/bleh.txt")
+        assertEquals(setOf("", "dir", "rid/boo", "rid/boo/text.txt", "rid"), depot.workspaces.listPaths(user, ws).toSet())
 
-        val sp2 = ws.save("another save point.", emptyList())
-        System.err.println("Save2: ${ParsingCommons.klaxon.toJsonString(sp2)}")
+        val sp2 = depot.workspaces.save(user, ws,"another save point.", emptyList())
         assertEquals(setOf(dull, dirDir, dirRid), sp2.modifiedArtifacts.toSet())
         assertEquals(sp.id, sp2.basis.savePointId)
     }

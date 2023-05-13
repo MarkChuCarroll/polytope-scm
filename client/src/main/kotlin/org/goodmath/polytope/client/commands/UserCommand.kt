@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.goodmath.polytope.client.cli
+package org.goodmath.polytope.client.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
@@ -23,8 +23,8 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.choice
 import kotlinx.coroutines.runBlocking
-import org.goodmath.polytope.client.ClientCommandException
-import org.goodmath.polytope.client.rest.RestApiClient
+import org.goodmath.polytope.client.api.RestApiClient
+import org.goodmath.polytope.common.PtException
 import org.goodmath.polytope.common.stashable.Action
 
 
@@ -36,9 +36,14 @@ class UserCmd: PolytopeCommandBase(name="user", help="work with users") {
         fun getCommand(): CliktCommand =
             UserCmd()
                 .subcommands(
-                    UserCreateCmd(), UserListCommand(), UserPasswordCommand(),
-                    UserGrantCommand(), UserRevokeCommand(), UserDeactivateCommand(),
-                    UserReactivateCommand(), UserGetCommand()
+                    UserGetCommand(),
+                    UserListCommand(),
+                    UserCreateCmd(),
+                    UserPasswordCommand(),
+                    UserGrantCommand(),
+                    UserRevokeCommand(),
+                    UserDeactivateCommand(),
+                    UserReactivateCommand(),
                 )
     }
 }
@@ -54,9 +59,9 @@ class UserCreateCmd: PolytopeCommandBase(name = "create", help="Create a new use
 
     override fun run() {
         handleCommandErrors("user", "create") {
-            val actingUser = asUser ?: getClientConfig().userId
+            val actingUser = asUser ?: requireUserId()
             val actingUserPassword = getOrPromptForPassword()
-            val server = serverUrl ?: getClientConfig().serverUrl
+            val server = serverUrl ?: requireServerUrl()
             val client = RestApiClient(server, actingUser, actingUserPassword)
             val result = runBlocking {
                 client.userCreate(username, fullName, email, password,
@@ -74,9 +79,9 @@ class UserReactivateCommand: PolytopeCommandBase(name="reactivate", help="Re-act
     private val username: String by option("-u", "--username", help="the userid of the user to reactivate").required()
     override fun run() {
         handleCommandErrors("user", "create") {
-            val actingUser = asUser ?: getClientConfig().userId
+            val actingUser = asUser ?: requireUserId()
             val actingUserPassword = getOrPromptForPassword()
-            val server = serverUrl ?: getClientConfig().serverUrl
+            val server = serverUrl ?:requireServerUrl()
             val client = RestApiClient(server, actingUser, actingUserPassword)
             runBlocking {
                 client.userReactivate(username)
@@ -92,9 +97,9 @@ class UserDeactivateCommand: PolytopeCommandBase(name="deactivate", help="Deacti
     private val username: String by option("-u", "--username", help="the userid of the user to deactivate").required()
     override fun run() {
         handleCommandErrors("user", "create") {
-            val actingUser = asUser ?: getClientConfig().userId
+            val actingUser = asUser ?: requireUserId()
             val actingUserPassword = getOrPromptForPassword()
-            val server = serverUrl ?: getClientConfig().serverUrl
+            val server = serverUrl ?: requireServerUrl()
             val client = RestApiClient(server, actingUser, actingUserPassword)
             runBlocking {
                 client.userDeactivate(username)
@@ -112,9 +117,9 @@ class UserGrantCommand: PolytopeCommandBase(name="grant", help="Grant a set of p
 
     override fun run() {
         handleCommandErrors("user", "create") {
-            val actingUser = asUser ?: getClientConfig().userId
+            val actingUser = asUser ?: requireUserId()
             val actingUserPassword = getOrPromptForPassword()
-            val server = serverUrl ?: getClientConfig().serverUrl
+            val server = serverUrl ?: requireServerUrl()
             val client = RestApiClient(server, actingUser, actingUserPassword)
             runBlocking {
                 client.userGrant(username,
@@ -134,9 +139,9 @@ class UserRevokeCommand: PolytopeCommandBase(name="revoke", help="Revoke a set o
 
     override fun run() {
         handleCommandErrors("user", "create") {
-            val actingUser = asUser ?: getClientConfig().userId
+            val actingUser = asUser ?: requireUserId()
             val actingUserPassword = getOrPromptForPassword()
-            val server = serverUrl ?: getClientConfig().serverUrl
+            val server = serverUrl ?: requireServerUrl()
             val client = RestApiClient(server, actingUser, actingUserPassword)
             runBlocking {
                 client.userRevoke(username,
@@ -155,15 +160,18 @@ class UserPasswordCommand: PolytopeCommandBase(name="set-password", help="Change
     private val password: String? by option("-p", "--password", help="the new password")
     override fun run() {
         handleCommandErrors("user", "create") {
-            val actingUser = asUser ?: getClientConfig().userId
+            val actingUser = asUser ?: getClientConfig()?.userId ?: throw PtException(
+                PtException.Kind.UserError,
+                "You must either provide a userid, or run this command in a workspace")
             val actingUserPassword = getOrPromptForPassword()
-            val server = serverUrl ?: getClientConfig().serverUrl
+            val server = serverUrl ?: getClientConfig()?.serverUrl ?: throw PtException(
+                PtException.Kind.UserError,
+                "You must either provide a server URL, or run this command in a workspace")
             val user = username ?: actingUser
             val newPassword = password ?: prompt(
                 text = "Enter password: ",
                 hideInput = true,
-            ) ?: throw ClientCommandException("user", "set-password", "could not read user password",
-                1)
+            ) ?: throw  PtException(PtException.Kind.Authentication, "could not read user password")
             val client = RestApiClient(server, actingUser, actingUserPassword)
             runBlocking {
                 client.userChangePassword(user, newPassword)
@@ -180,9 +188,9 @@ class UserListCommand: PolytopeCommandBase(name="list", help="List all users") {
 
     override fun run() {
         handleCommandErrors("user", "create") {
-            val actingUser = asUser ?: getClientConfig().userId
+            val actingUser = asUser ?: requireUserId()
             val actingUserPassword = getOrPromptForPassword()
-            val server = serverUrl ?: getClientConfig().serverUrl
+            val server = serverUrl ?: requireServerUrl()
             val client = RestApiClient(server, actingUser, actingUserPassword)
             val users = runBlocking {
                 client.userList()
@@ -193,7 +201,7 @@ class UserListCommand: PolytopeCommandBase(name="list", help="List all users") {
                     echo(String.format("%-20s|%-30s|%30s|%6s|", u.username, u.fullName, u.email, u.active))
                 }
             } else {
-                echo(klaxon.toJsonString(users))
+                echo(prettyJson(users))
             }
         }
     }
@@ -207,9 +215,9 @@ class UserGetCommand: PolytopeCommandBase(name="get", help="Get information abou
     private val username: String by option("-u", "--username", help="the userid of the user to retrieve").required()
     override fun run() {
         handleCommandErrors("user", "create") {
-            val actingUser = asUser ?: getClientConfig().userId
+            val actingUser = asUser ?: requireUserId()
             val actingUserPassword = getOrPromptForPassword()
-            val server = serverUrl ?: getClientConfig().serverUrl
+            val server = serverUrl ?: requireServerUrl()
             val client = RestApiClient(server, actingUser, actingUserPassword)
             val result = runBlocking {
                 client.userGet(username)

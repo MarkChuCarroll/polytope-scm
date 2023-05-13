@@ -16,6 +16,8 @@
 package org.goodmath.polytope.common.stashable
 
 import kotlinx.serialization.Serializable
+import org.goodmath.polytope.common.util.toLocalDateTime
+import java.lang.StringBuilder
 
 @Serializable
 data class History(
@@ -26,7 +28,18 @@ data class History(
     val timestamp: Long,
     val basis: ProjectVersionSpecifier,
     val steps: MutableList<Id<HistoryStep>>
-)
+) {
+    fun render(): String {
+        val ts = toLocalDateTime(timestamp)
+        val result = StringBuilder()
+        result.append("History: $name\n")
+            .append("Created at: $ts\n")
+            .append("Description: $description\n")
+            .append("Basis: $basis\n")
+            .append("Contains ${steps.size} steps")
+        return result.toString()
+    }
+}
 
 @Serializable
 data class HistoryStep(
@@ -38,4 +51,12 @@ data class HistoryStep(
     val baselineId: Id<Artifact>,
     val baselineVersionId: Id<ArtifactVersion>,
     val description: String
-)
+) {
+    fun render(): String {
+        val result = StringBuilder()
+        result.append("Step: $project::$historyName[$number]\n")
+            .append("Baseline: ${baselineVersionId}\n")
+            .append("Description: ${description}")
+        return result.toString()
+    }
+}

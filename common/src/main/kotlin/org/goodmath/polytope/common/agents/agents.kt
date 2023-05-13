@@ -18,6 +18,7 @@ package org.goodmath.polytope.common.agents
 import org.goodmath.polytope.common.stashable.Artifact
 import org.goodmath.polytope.common.stashable.ArtifactVersion
 import org.goodmath.polytope.common.stashable.Id
+import java.lang.StringBuilder
 
 data class MergeConflict(
     val id: Id<MergeConflict>,
@@ -26,7 +27,20 @@ data class MergeConflict(
     val sourceVersion: Id<ArtifactVersion>,
     val targetVersion: Id<ArtifactVersion>,
     val details: String
-)
+) {
+    fun render(indent: Int = 0): String {
+        val result = StringBuilder()
+        result.append("\t".repeat(indent))
+            .append("Conflict: $id on $artifactId\n")
+            .append("\t".repeat(indent))
+            .append("Artifact type: $artifactType\n")
+            .append("\t".repeat(indent))
+            .append("Source version: $sourceVersion\n")
+            .append("\t".repeat(indent))
+            .append("Target version: $targetVersion\n")
+        return result.toString()
+    }
+}
 
 data class MergeResult(
     val artifactType: String,

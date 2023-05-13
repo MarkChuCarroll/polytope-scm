@@ -62,7 +62,18 @@ data class UserUpdateRequest(
 }
 
 @Serializable
+data class ChangeListResponse(
+    val changes: List<Change>
+)
+
+
+@Serializable
 data class UserListResponse(val users: List<User>)
+
+@Serializable
+data class SavesListResponse(
+    val saves: List<SavePoint>
+)
 
 @Serializable
 data class HistoryCreateRequest(
@@ -80,13 +91,35 @@ data class WorkspaceCreateRequest(
 )
 
 data class WorkspaceCreateChangeRequest(
-    val name: String,
+    val history: String,
+    val changeName: String,
     val description: String)
 
 data class WorkspaceAddFileRequest(
     val path: String,
     val artifactType: String,
     val content: String)
+
+data class HistoryListResponse(
+    val histories: List<History>
+)
+
+data class HistoryStepsResponse(
+    val steps: List<HistoryStep>
+)
+
+data class WorkspaceResetRequest(
+    val reason: String,
+    val stepIndex: Int?
+)
+
+data class WorkspaceListResponse(
+    val workspaces: List<WorkspaceDescriptor>
+)
+
+data class PathListResponse(
+    val paths: List<String>
+)
 
 data class WorkspaceMoveFileRequest(
     val pathBefore: String,
@@ -112,7 +145,12 @@ data class WorkspaceDeliverRequest(
     val description: String,
 )
 
-data class WorkspaceIntegrateRequest(
+data class WorkspaceIntegrateChangeRequest(
+    val sourceHistory: String,
+    val changeName: String
+)
+
+data class WorkspaceIntegrateDiffRequest(
     val fromVersion: ProjectVersionSpecifier,
     val toVersion: ProjectVersionSpecifier
 )

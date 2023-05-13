@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.goodmath.polytope.client.rest
+package org.goodmath.polytope.client.api
 
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -25,11 +25,10 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import org.goodmath.polytope.client.cli.klaxon
+import org.goodmath.polytope.client.commands.klaxon
 import org.goodmath.polytope.common.*
 import org.goodmath.polytope.common.stashable.*
 
-typealias AuthToken = String
 
 /**
  * A client API wrapping the Polytope server REST API.
@@ -293,7 +292,7 @@ class RestApiClient(
         }
     }
 
-    suspend fun historyList(project: String): List<History> {
+    suspend fun historyList(project: String): HistoryListResponse {
         return runWithErrorHandling {
             client.get(serverUrl) {
                 headers {
@@ -301,6 +300,20 @@ class RestApiClient(
                 }
                 url {
                     appendPathSegments("projects", project, "histories")
+                }
+            }
+        }
+    }
+
+    suspend fun historyOpen(project: String, wsName: String, historyName: String): Workspace {
+        return runWithErrorHandling {
+            client.post(serverUrl) {
+                headers {
+                    contentType(ContentType.Application.Json)
+                }
+                url {
+                    appendPathSegments("projects", project, "workspaces", wsName, "action",
+                        "openHistory", historyName)
                 }
             }
         }
@@ -343,7 +356,7 @@ class RestApiClient(
 
     }
 
-    suspend fun stepsList(project: String, history: String): List<HistoryStep> {
+    suspend fun stepsList(project: String, history: String): HistoryStepsResponse {
         return runWithErrorHandling {
             client.get(serverUrl) {
                 headers {
@@ -356,7 +369,21 @@ class RestApiClient(
         }
     }
 
-    suspend fun changesList(project: String, history: String): List<Change> {
+    suspend fun abortChange(project: String, history: String, change: String, reason: String): Change {
+        return runWithErrorHandling {
+            client.delete(serverUrl) {
+                headers {
+                    contentType(ContentType.Text.Plain)
+                }
+                url {
+                    appendPathSegments("projects", project, "histories", history, "changes", change)
+                }
+                setBody(reason)
+            }
+        }
+    }
+
+    suspend fun changesList(project: String, history: String, show: String): ChangeListResponse {
         return runWithErrorHandling {
             client.get(serverUrl) {
                 headers {
@@ -364,6 +391,7 @@ class RestApiClient(
                 }
                 url {
                     appendPathSegments("projects", project, "histories", history, "changes")
+                    parameters.append("show", show)
                 }
             }
         }
@@ -382,7 +410,7 @@ class RestApiClient(
         }
     }
 
-    suspend fun savesList(project: String, history: String, change: String): List<SavePoint> {
+    suspend fun savesList(project: String, history: String, change: String): SavesListResponse {
         return runWithErrorHandling {
             client.get(serverUrl) {
                 headers {
@@ -395,7 +423,7 @@ class RestApiClient(
         }
     }
 
-    suspend fun workspacesList(project: String): List<WorkspaceDescriptor> {
+    suspend fun workspacesList(project: String): WorkspaceListResponse {
         return runWithErrorHandling {
             client.get(serverUrl) {
                 headers {
@@ -431,33 +459,34 @@ class RestApiClient(
         }
     }
 
-    suspend fun workspaceGet(project: String, name: String): Workspace {
+    suspend fun workspaceGet(project: String, wsName: String): Workspace {
         return runWithErrorHandling {
             client.get(serverUrl) {
                 headers {
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name)
+                    appendPathSegments("projects", project, "workspaces", wsName)
                 }
             }
         }
     }
 
-    suspend fun workspaceUtd(project: String, name: String): Boolean {
+    suspend fun workspaceUtd(project: String, wsName: String): Boolean {
         return runWithErrorHandling {
             client.get(serverUrl) {
                 headers {
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "utd")
+                    appendPathSegments("projects", project, "workspaces", wsName, "utd")
                 }
             }
         }
     }
 
-    suspend fun workspaceCreateChange(project: String, name: String,
+    suspend fun workspaceCreateChange(project: String, wsName: String,
+                                      historyName: String, changeName: String,
                                       description: String): Workspace {
         return runWithErrorHandling {
             client.post(serverUrl) {
@@ -465,41 +494,46 @@ class RestApiClient(
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "action", "createChange")
-                    setBody(WorkspaceCreateChangeRequest(name, description))
+                    appendPathSegments("projects", project, "workspaces", wsName, "action", "createChange")
+                    setBody(WorkspaceCreateChangeRequest(
+                        history = historyName,
+                        changeName = changeName,
+                        description = description))
                 }
             }
         }
     }
 
-    suspend fun workspaceOpenChange(project: String, name: String): Workspace {
+    suspend fun workspaceOpenChange(project: String, wsName: String,
+                                    historyName: String, changeName: String): Workspace {
         return runWithErrorHandling {
             client.post(serverUrl) {
                 headers {
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "action", "openChange", name)
+                    appendPathSegments("projects", project, "workspaces", wsName, "action", "openChange", changeName)
+                    parameters.append("history", historyName)
                 }
             }
         }
     }
 
 
-    suspend fun workspaceListPaths(project: String, name: String): List<String> {
+    suspend fun workspaceListPaths(project: String, wsName: String): PathListResponse {
         return runWithErrorHandling {
             client.get(serverUrl) {
                 headers {
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "paths")
+                    appendPathSegments("projects", project, "workspaces", wsName, "paths")
                 }
             }
         }
     }
 
-    suspend fun workspaceAddFile(project: String, name: String,
+    suspend fun workspaceAddFile(project: String, wsName: String,
                                  path: String, contents: WorkspaceFileContents
     ): Workspace {
         return runWithErrorHandling {
@@ -508,7 +542,7 @@ class RestApiClient(
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "paths")
+                    appendPathSegments("projects", project, "workspaces", wsName, "paths")
                     appendPathSegments(path.split("/"))
                     setBody(contents)
                 }
@@ -516,7 +550,7 @@ class RestApiClient(
         }
     }
 
-    suspend fun workspaceMoveFile(project: String, name: String,
+    suspend fun workspaceMoveFile(project: String, wsName: String,
                                   oldPath: String, newPath: String): Workspace {
         return runWithErrorHandling {
             client.post(serverUrl) {
@@ -524,29 +558,29 @@ class RestApiClient(
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "action", "move")
+                    appendPathSegments("projects", project, "workspaces", wsName, "action", "move")
                     setBody(WorkspaceMoveFileRequest(oldPath, newPath))
                 }
             }
         }
     }
 
-    suspend fun workspaceDeleteFile(project: String, name: String,
-                                 path: String): List<String> {
+    suspend fun workspaceDeleteFile(project: String, wsName: String,
+                                    path: String): List<String> {
         return runWithErrorHandling {
             client.delete(serverUrl) {
                 headers {
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "paths")
+                    appendPathSegments("projects", project, "workspaces", wsName, "paths")
                     appendPathSegments(path.split("/"))
                 }
             }
         }
     }
 
-    suspend fun workspaceModifyFile(project: String, name: String,
+    suspend fun workspaceModifyFile(project: String, wsName: String,
                                     path: String, contents: String): Workspace {
         return runWithErrorHandling {
             client.put(serverUrl) {
@@ -554,7 +588,7 @@ class RestApiClient(
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "paths")
+                    appendPathSegments("projects", project, "workspaces", wsName, "paths")
                     appendPathSegments(path.split("/"))
                 }
                 setBody(contents)
@@ -562,7 +596,7 @@ class RestApiClient(
         }
     }
 
-    suspend fun workspaceGetFile(project: String, name: String,
+    suspend fun workspaceGetFile(project: String, wsName: String,
                                  path: String): WorkspaceFileContents {
         return runWithErrorHandling {
             client.get(serverUrl) {
@@ -570,7 +604,7 @@ class RestApiClient(
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "paths")
+                    appendPathSegments("projects", project, "workspaces", wsName, "paths")
                     appendPathSegments(path.split("/"))
                 }
             }
@@ -578,7 +612,7 @@ class RestApiClient(
     }
 
 
-    suspend fun workspaceGetFiles(project: String, name: String,
+    suspend fun workspaceGetFiles(project: String, wsName: String,
                                   paths: List<String>): List<WorkspaceFileContents> {
         return runWithErrorHandling {
             client.post(serverUrl) {
@@ -586,13 +620,13 @@ class RestApiClient(
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "multi")
+                    appendPathSegments("projects", project, "workspaces", wsName, "multi")
                 }
                 setBody(WorkspaceGetMultiRequest(paths))
             }
         }
     }
-    suspend fun workspaceSave(project: String, name: String, description: String,
+    suspend fun workspaceSave(project: String, wsName: String, description: String,
                               resolved: List<String>): Workspace {
         return runWithErrorHandling {
             client.post(serverUrl) {
@@ -600,13 +634,13 @@ class RestApiClient(
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "action", "save")
+                    appendPathSegments("projects", project, "workspaces", wsName, "action", "save")
                 }
                 setBody(WorkspaceSaveRequest(description, resolved))
             }
         }
     }
-    suspend fun workspaceDeliver(project: String, name: String,
+    suspend fun workspaceDeliver(project: String, wsName: String,
                                  description: String): Workspace {
         return runWithErrorHandling {
             client.post(serverUrl) {
@@ -614,26 +648,26 @@ class RestApiClient(
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "action", "deliver")
+                    appendPathSegments("projects", project, "workspaces", wsName, "action", "deliver")
                 }
                 setBody(WorkspaceDeliverRequest(description))
             }
         }
     }
-    suspend fun workspaceUpdate(project: String, name: String): Workspace {
+    suspend fun workspaceUpdate(project: String, wsName: String): Workspace {
         return runWithErrorHandling {
             client.post(serverUrl) {
                 headers {
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "action", "update")
+                    appendPathSegments("projects", project, "workspaces", wsName, "action", "update")
                 }
             }
         }
     }
 
-    suspend fun workspaceIntegrate(project: String, name: String,
+    suspend fun workspaceIntegrateDiff(project: String, wsName: String,
                                    from: ProjectVersionSpecifier,
                                    to: ProjectVersionSpecifier
     ): Workspace {
@@ -643,35 +677,53 @@ class RestApiClient(
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "action", "integrate")
-                    setBody(WorkspaceIntegrateRequest(from, to))
+                    appendPathSegments("projects", project, "workspaces", wsName, "action", "integrateDiff")
+                    setBody(WorkspaceIntegrateDiffRequest(from, to))
                 }
             }
         }
     }
 
-    suspend fun workspaceDelete(project: String, name: String): Workspace {
-        return runWithErrorHandling {
-            client.delete(serverUrl) {
-                headers {
-                    contentType(ContentType.Application.Json)
-                }
-                url {
-                    appendPathSegments("projects", project, "workspaces", name)
-                }
-            }
-        }
-    }
-
-    suspend fun workspaceAbandon(project: String, name: String): Workspace {
+    suspend fun workspaceIntegrateChange(project: String, wsName: String,
+                                         history: String,
+                                         change: String): Workspace {
         return runWithErrorHandling {
             client.post(serverUrl) {
                 headers {
                     contentType(ContentType.Application.Json)
                 }
                 url {
-                    appendPathSegments("projects", project, "workspaces", name, "action", "abandon")
+                    appendPathSegments("projects", project, "workspaces", wsName, "action", "integrateChange")
+                    setBody(WorkspaceIntegrateChangeRequest(history, change))
                 }
+            }
+        }
+    }
+
+
+    suspend fun workspaceDelete(project: String, wsName: String): Workspace {
+        return runWithErrorHandling {
+            client.delete(serverUrl) {
+                headers {
+                    contentType(ContentType.Application.Json)
+                }
+                url {
+                    appendPathSegments("projects", project, "workspaces", wsName)
+                }
+            }
+        }
+    }
+
+    suspend fun workspaceReset(project: String, wsName: String, reason: String, stepIndex: Int?): Workspace {
+        return runWithErrorHandling {
+            client.post(serverUrl) {
+                headers {
+                    contentType(ContentType.Application.Json)
+                }
+                url {
+                    appendPathSegments("projects", project, "workspaces", wsName, "action", "reset")
+                }
+                setBody(WorkspaceResetRequest(reason, stepIndex))
             }
         }
     }

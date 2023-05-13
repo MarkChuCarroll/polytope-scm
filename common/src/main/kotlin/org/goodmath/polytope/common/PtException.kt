@@ -24,10 +24,32 @@ open class PtException(
     override val cause: Throwable? = null): Exception("Error($kind): $msg", cause) {
 
     enum class Kind {
-        Internal, InvalidParameter, Permission,
-        NotFound, Conflict, Authentication,
-        Parsing, Constraint, TypeError,
-        UserError, Client;
+        Internal, // Error 121 (EREMOTEIO)
+        InvalidParameter, // error 22 (EINVAL)
+        Permission,  // error 13 (EACCES)
+        NotFound,   // error 2 (ENOENT)
+        Conflict,  // error 16 (EBUSY)
+        Authentication, // Error 13 (EACCESS)
+        Parsing,   //  Error 5 (EIO)
+        Constraint, // Error 33 (EDOM)
+        TypeError, // Error 34 (ERANGE)
+        UserError, // Error 1(EPERM)
+        Client; // Error 10 (ECHILD)
+
+        fun toExitCode(): Int =
+            when(this) {
+                Internal -> 121
+                InvalidParameter -> 22
+                Permission -> 13
+                NotFound -> 2
+                Conflict -> 16
+                Authentication -> 13
+                Parsing -> 5
+                Constraint -> 33
+                TypeError -> 34
+                UserError -> 1
+                Client -> 10
+            }
 
         companion object {
             fun fromStatusCode(code: HttpStatusCode): Kind {

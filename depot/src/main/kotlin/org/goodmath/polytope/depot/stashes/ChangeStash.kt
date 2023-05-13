@@ -146,23 +146,6 @@ class ChangeStash(
     }
 
     /**
-     * Get the status of a change.
-     * @param auth the user performing the operation.
-     * @param project the project containing the change.
-     * @param history the history containing the change.
-     * @param changeName the name of the change.
-     * @return the change status of the change.
-     */
-    fun getChangeStatus(
-        auth: AuthenticatedUser,
-        project: String, history: String, changeName: String
-    ): ChangeStatus {
-        depot.users.validatePermissions(auth, Action.readProject(project))
-        val change = retrieveChangeByName(auth, project, history, changeName)
-        return change.status
-    }
-
-    /**
      * Create a save point in an open change.
      * @param auth the user performing the operation.
      * @param project the project containing the change.
@@ -259,18 +242,32 @@ class ChangeStash(
      * @param auth the user performing the operation.
      * @param project the project containing the change.
      * @param historyName the name of the history.
+     * @param show the minimum status to include in the result list. If this is "Aborted", then
+     *    all changes, open, closed, and aborted will be included; if it's "Closed", then both open
+     *    and closed will be included, but aborted changes will not; if it's "Open", then all changes
+     *    will be included
      * @return a list of changes.
      */
     fun listChanges(
         auth: AuthenticatedUser,
         project: String,
-        historyName: String
+        historyName: String,
+        show: ChangeStatus
     ): List<Change> {
         depot.users.validatePermissions(auth, Action.readProject(project))
         val index = getCollectionIndex()
-        return index.entries.entries.filter { it.key.project == project && it.key.history == historyName }
+        val allChanges = index.entries.entries.filter { it.key.project == project && it.key.history == historyName }
             .map { entry -> retrieveChange(auth, project, entry.value)}
+        val filter = when(show) {
+            ChangeStatus.Aborted -> { change: Change -> true }
+            ChangeStatus.Closed -> { change: Change ->
+                change.status == ChangeStatus.Closed ||
+                        change.status == ChangeStatus.Open
+            }
 
+            ChangeStatus.Open -> { change: Change -> change.status == ChangeStatus.Open }
+        }
+        return allChanges.filter(filter)
     }
 
     override fun initStorage(config: Config) {

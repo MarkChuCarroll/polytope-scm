@@ -275,10 +275,15 @@ class WorkspaceStash(
     fun createChange(
         auth: AuthenticatedUser,
         ws: Workspace,
+        history: String,
         changeName: String,
         description: String
     ): Change {
         depot.users.validatePermissions(auth, Action.writeProject(ws.project))
+        ensureNoUnsavedChanges(ws)
+        if (ws.history != history) {
+            openHistory(auth, ws, history)
+        }
         val ch = depot.changes.createChange(
             auth, ws.project, ws.history, changeName,
             ws.basis,
@@ -289,17 +294,19 @@ class WorkspaceStash(
         return ch
     }
 
+    private fun ensureNoUnsavedChanges(ws: Workspace) {
+        if (ws.modifiedArtifacts.isNotEmpty() || ws.workingVersions.isNotEmpty()) {
+            throw PtException(PtException.Kind.Constraint,
+                "Unsaved changes in workspace")
+        }
+    }
+
     fun openHistory(
             auth: AuthenticatedUser,
             ws: Workspace,
             history: String): Workspace {
         depot.users.validatePermissions(auth, Action.writeProject(ws.project))
-        if (ws.modifiedArtifacts.isNotEmpty()) {
-            throw PtException(
-                    PtException.Kind.UserError,
-                    "A new history can't be opened in a workspace with unsaved changes"
-            )
-        }
+        ensureNoUnsavedChanges(ws)
         ws.history = history
         ws.change = null
         val basis = ProjectVersionSpecifier.history(ws.project, history)
@@ -319,8 +326,8 @@ class WorkspaceStash(
         auth: AuthenticatedUser,
         ws: Workspace,
         history: String,
-        changeName: String
-    ) {
+        changeName: String,
+    ): Workspace {
         depot.users.validatePermissions(auth, Action.writeProject(ws.project))
         if (ws.modifiedArtifacts.isNotEmpty()) {
             throw PtException(
@@ -332,6 +339,7 @@ class WorkspaceStash(
         ws.history = history
         val basis = ProjectVersionSpecifier.change(ws.project, history, changeName)
         setBasis(auth, ws, basis)
+        return ws
     }
 
     /**
@@ -1012,12 +1020,11 @@ class WorkspaceStash(
      * @param from the start point of the changes to integrate to this workspace.
      * @param to the target point of the changes to integrate to this workspace.
      */
-    fun integrate(
+    fun integrateChange(
         auth: AuthenticatedUser,
         ws: Workspace,
-        from: ProjectVersionSpecifier,
-        to: ProjectVersionSpecifier
-    ): List<MergeConflict> {
+        changeSourceHistory: String,
+        changeName: String): List<MergeConflict> {
         depot.users.validatePermissions(auth, Action.writeProject(ws.project))
         if (ws.modifiedArtifacts.isNotEmpty()) {
             throw PtException(
@@ -1031,23 +1038,50 @@ class WorkspaceStash(
                 "Workspace must be clean before calling integrate, but you have unresolved conflicts"
             )
         }
-
-        System.err.println("Integrate from $from to $to")
         TODO()
     }
+
+    fun integrateDiff(
+        auth: AuthenticatedUser,
+        ws: Workspace,
+        fromVersion: ProjectVersionSpecifier,
+        toVersion: ProjectVersionSpecifier): List<MergeConflict> {
+        depot.users.validatePermissions(auth, Action.writeProject(ws.project))
+        if (ws.modifiedArtifacts.isNotEmpty()) {
+            throw PtException(
+                PtException.Kind.UserError,
+                "Workspace must be clean before calling integrate, but you have unsaved changes"
+            )
+        }
+        if (ws.conflicts.isNotEmpty()) {
+            throw PtException(
+                PtException.Kind.UserError,
+                "Workspace must be clean before calling integrate, but you have unresolved conflicts"
+            )
+        }
+        TODO()
+    }
+
 
     fun deleteWorkspace(auth: AuthenticatedUser,
                         ws: Workspace) {
         depot.users.validatePermissions(auth, Action.writeProject(ws.project))
-        TODO()
+        depot.workspaces.deleteWorkspace(auth, ws)
     }
 
     fun abandonChanges(auth: AuthenticatedUser,
                        ws: Workspace,
-                       reason: String) {
+                       reason: String,
+                       idx: Int?) {
         depot.users.validatePermissions(auth, Action.writeProject(ws.project))
-        System.err.println("Abandon change to $ws because $reason")
-        TODO()
+
+        val change = depot.changes.retrieveChangeByName(auth, ws.project, ws.history, ws.change!!)
+        val saveId = if (idx != null) {
+            change.savePoints[idx]
+        } else {
+            change.savePoints.last()
+        }
+        setBasis(auth, ws, ProjectVersionSpecifier.savePoint(ws.project, ws.history, saveId))
     }
 
 }

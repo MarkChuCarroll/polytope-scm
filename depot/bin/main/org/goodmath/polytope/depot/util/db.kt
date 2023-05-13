@@ -19,6 +19,8 @@ package org.goodmath.polytope.depot.util
 import maryk.rocksdb.ColumnFamilyHandle
 import maryk.rocksdb.RocksDB
 import maryk.rocksdb.WriteBatch
+import org.goodmath.polytope.common.util.ParsingCommons
+import org.goodmath.polytope.common.util.parse
 import org.rocksdb.WriteOptions
 import kotlin.text.Charsets.UTF_8
 
@@ -123,6 +125,7 @@ inline fun<reified T> RocksDB.listAllInColumn(
         if (next != null && pred(next)) {
             result.add(next)
         }
+        iter.next()
     }
     iter.close()
     return result

@@ -13,18 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.goodmath.polytope.client.cli
+package org.goodmath.polytope.client.commands
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.LoggerContext
+import com.beust.klaxon.JsonObject
 import com.beust.klaxon.Klaxon
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
-import org.goodmath.polytope.client.ClientCommandException
-import org.goodmath.polytope.client.ClientConfig
-import org.goodmath.polytope.client.ClientException
+import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.choice
+import org.goodmath.polytope.client.workspace.ClientConfig
 import org.goodmath.polytope.client.workspace.ClientWorkspace
 import org.goodmath.polytope.common.PtException
 import org.slf4j.LoggerFactory
-import java.lang.Exception
 import java.nio.file.Path
 import kotlin.io.path.Path
 import kotlin.io.path.bufferedReader
@@ -35,14 +39,31 @@ import kotlin.system.exitProcess
 
 val klaxon = Klaxon()
 
-
-
-
 abstract class PolytopeCommandBase(name: String, help: String): CliktCommand(name=name, help=help) {
-    val logger = LoggerFactory.getLogger(PolytopeCommandBase::class.java)
-    val homedir = Path(System.getenv("HOME"))
-    var workspace: ClientWorkspace? = null
-    var cfg: ClientConfig? = null
+    private val logger = LoggerFactory.getLogger(PolytopeCommandBase::class.java)
+    private val homedir = Path(System.getenv("HOME"))
+    private var workspace: ClientWorkspace? = null
+    private var cfg: ClientConfig? = null
+
+    /**
+     * This is used by commands that require a workspace. If the command is not run in a
+     * workspace, this will throw an exception.
+     */
+    fun requireWorkspace(): ClientWorkspace {
+        return loadWorkspace() ?: throw PtException(PtException.Kind.UserError,
+            "Command must be run inside of a workspace")
+    }
+
+    fun requireServerUrl(): String {
+        return getClientConfig()?.serverUrl ?: throw PtException(PtException.Kind.UserError,
+            "You must either supply a serverURL, or have a serverURL stored in your user or workspace config")
+
+    }
+
+    fun requireUserId(): String {
+        return getClientConfig()?.userId ?: throw PtException(PtException.Kind.UserError,
+            "You must either supply a userid, or have your userid stored in your user or workspace config")
+    }
 
     fun getOrPromptForPassword(): String {
         fun tryFromPath(p: Path): String? {
@@ -57,21 +78,34 @@ abstract class PolytopeCommandBase(name: String, help: String): CliktCommand(nam
             ?: prompt(
                 text = "Enter password: ",
                 hideInput = true,
-            ) ?: throw ClientException("login", "Could not read user password")
+            ) ?: throw PtException(PtException.Kind.Authentication,
+                 "Could not read user password")
     }
 
 
-    fun getClientConfig(): ClientConfig {
-        return ClientConfig.load()
+    fun getClientConfig(): ClientConfig? {
+        if (cfg == null) {
+            cfg = ClientConfig.load()
+        }
+        return cfg
+    }
+
+    fun requireClientConfig(): ClientConfig {
+        return getClientConfig() ?: throw PtException(PtException.Kind.NotFound,
+            "configuration not found")
+    }
+
+    fun prettyJson(t: Any): String {
+        return klaxon.parse<JsonObject>(klaxon.toJsonString(t))!!.toJsonString(true)
     }
 
     fun loadWorkspace(): ClientWorkspace? {
         if (workspace == null) {
-            val cfg = ClientConfig.load()
-            workspace = ClientWorkspace(cfg)
+            logger.info("Loading workspace")
+            val cfg = ClientConfig.load() ?: return null
+            workspace = ClientWorkspace(cfg, cfg.wsName)
         }
         return workspace
-
     }
 
     fun handleCommandErrors(noun: String, verb: String, body: () -> Unit) {
@@ -89,15 +123,9 @@ abstract class PolytopeCommandBase(name: String, help: String): CliktCommand(nam
 
     private fun printErrorAndExit(noun: String, verb: String, e: Throwable) {
         when(e) {
-            is ClientCommandException -> {
-                echo("Error performing $noun $verb: ${e.message}", err = true)
-                exitProcess(e.exitCode)
-            }
-            is ClientException -> {
-                echo(e.message)
-            }
-            is PtException ->{
+            is PtException -> {
                 echo(e.toString())
+                exitProcess(e.kind.toExitCode())
             }
             else -> {
                 echo("Unexpected internal error performing $noun $verb: $e", err = true)
@@ -106,11 +134,21 @@ abstract class PolytopeCommandBase(name: String, help: String): CliktCommand(nam
             }
         }
     }
-
 }
 
 class Polytope: PolytopeCommandBase("pt", help="The polytope command line client") {
+    private val logLevel: String by option("--logging", help="The logging level to display")
+        .choice("error", "warning", "info", "trace", "all", "none")
+        .default("none")
+
+    private fun updateLoggingLevel(level: String) {
+        val loggerContext = LoggerFactory.getILoggerFactory() as LoggerContext
+        val logger: Logger = loggerContext.getLogger(PolytopeCommandBase::class.java)
+        logger.level = Level.toLevel(level)
+    }
+
     override fun run() {
+        updateLoggingLevel(logLevel)
     }
 
     companion object {

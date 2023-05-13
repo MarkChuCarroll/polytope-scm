@@ -1,4 +1,4 @@
-package org.goodmath.polytope.client
+package org.goodmath.polytope.client.workspace
 import com.beust.klaxon.Klaxon
 import org.goodmath.polytope.common.PtException
 import java.nio.file.Path
@@ -27,29 +27,35 @@ data class ClientConfig(
     val userId: String,
     val userFullName: String,
     val email: String,
-    val password: String,
+    val password: String?,
     val ignorePatterns: List<String>,
     val serverUrl: String,
+    val wsName: String,
     val wsPath: Path
 ) {
 
     companion object {
         val klaxon = Klaxon()
 
-        fun load(): ClientConfig {
+        fun load(): ClientConfig? {
             val wsConfig = WorkspaceConfig.load(Path("."))
             val userConfig = UserConfig.load()
-            val password = findAndLoadPassword(wsConfig.wsPath)
+            val password = if (wsConfig != null) {
+                findAndLoadPassword(wsConfig.wsPath)
+            } else {
+                null
+            }
+            val userId = wsConfig?.userId ?: userConfig.userId ?: return null
+            val email = wsConfig?.email ?: userConfig.email ?: return null
+            val fullName = wsConfig?.userFullName ?: userConfig.userId ?: return null
             return ClientConfig(
-                userId = wsConfig.userId ?: userConfig.userId
-                   ?: throw PtException(PtException.Kind.UserError, "Configuration must define a userId"),
-                email = wsConfig.email ?: userConfig.email
-                ?: throw PtException(PtException.Kind.UserError, "Configuration must define an email address"),
-                userFullName = wsConfig.userFullName ?: userConfig.userFullName
-                ?: throw PtException(PtException.Kind.UserError, "Configuration must define a user full name"),
-                ignorePatterns = wsConfig.ignorePatterns + userConfig.ignorePatterns,
-                serverUrl = wsConfig.serverUrl,
-                wsPath = Path(wsConfig.wsPath),
+                userId,
+                email,
+                fullName,
+                ignorePatterns = (wsConfig?.ignorePatterns ?: emptyList()) + userConfig.ignorePatterns,
+                serverUrl = wsConfig?.serverUrl ?: return null,
+                wsPath = Path(wsConfig?.wsPath ?: return null),
+                wsName = wsConfig.wsName,
                 password = password)
 
         }
@@ -78,13 +84,14 @@ data class UserConfig(
         fun load(): UserConfig {
             val cfgPath = Path("~/.config/polytope/config.json")
             if (cfgPath.exists()) {
-                return ClientConfig.klaxon.parse(cfgPath.toFile())?:UserConfig()
+                return ClientConfig.klaxon.parse(cfgPath.toFile())?: UserConfig()
             }
             return UserConfig()
         }
     }
 }
 data class WorkspaceConfig(
+    val wsName: String,
     val serverUrl: String,
     val wsPath: String,
     val userId: String? = null,
@@ -105,18 +112,15 @@ data class WorkspaceConfig(
             }
         }
 
-        fun load(path: Path = Path(".")): WorkspaceConfig {
+        fun load(path: Path = Path(".")): WorkspaceConfig? {
             val wsPath = findWorkspace(path)
-                ?: throw PtException(PtException.Kind.UserError,
-                    "Command must be run in a workspace")
+                ?: return null
             val cfgPath = wsPath / ".pt" / "config.json"
-            if (cfgPath.exists()) {
-                return ClientConfig.klaxon.parse(cfgPath.toFile()) ?:
-                        throw PtException(PtException.Kind.UserError,
-                            "Invalid configuration file")
+            return if (cfgPath.exists()) {
+                ClientConfig.klaxon.parse(cfgPath.toFile()) ?: throw PtException(PtException.Kind.UserError,
+                    "Invalid configuration file")
             } else {
-                throw PtException(PtException.Kind.UserError,
-                    "Workspace directory must contain a configuration")
+                null
             }
         }
     }

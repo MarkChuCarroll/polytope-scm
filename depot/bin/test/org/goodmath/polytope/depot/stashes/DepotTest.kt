@@ -17,11 +17,15 @@
 package org.goodmath.polytope.depot.stashes
 
 import org.goodmath.polytope.TestStub
+import org.goodmath.polytope.common.agents.BaselineAgent
+import org.goodmath.polytope.common.agents.DirectoryAgent
+import org.goodmath.polytope.common.agents.text.Text
+import org.goodmath.polytope.common.agents.text.TextAgent
+import org.goodmath.polytope.common.stashable.ArtifactVersion
+import org.goodmath.polytope.common.stashable.AuthenticatedUser
+import org.goodmath.polytope.common.stashable.ChangeStatus
+import org.goodmath.polytope.common.stashable.ProjectVersionSpecifier
 import org.goodmath.polytope.depot.Depot
-import org.goodmath.polytope.depot.agents.BaselineAgent
-import org.goodmath.polytope.depot.agents.DirectoryAgent
-import org.goodmath.polytope.depot.agents.text.Text
-import org.goodmath.polytope.depot.agents.text.TextAgent
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.assertEquals
@@ -74,18 +78,18 @@ class DepotTest: TestStub() {
         assertEquals("testie", pr.name)
         assertDoesNotThrow {
             val hist = depot.histories.retrieveHistory(auth, pr.name, "main")
-            val hver = depot.histories.retrieveHistoryStep(
+            val hVer = depot.histories.retrieveHistoryStep(
                 auth,
                 pr.name,
                 hist.name,
                 hist.steps.size - 1
             )
-            assertEquals(hver.historyName, hist.name)
+            assertEquals(hVer.historyName, hist.name)
             val baselineVer = depot.artifacts.retrieveVersion(
                 auth,
                 pr.name,
-                hver.baselineId,
-                hver.baselineVersionId
+                hVer.baselineId,
+                hVer.baselineVersionId
             )
             val baseline = BaselineAgent.decodeFromString(baselineVer.content)
             assertEquals(1, baseline.entries.size)
@@ -108,7 +112,7 @@ class DepotTest: TestStub() {
         depot.projects.createProject(auth, "testie", "a test")
         val pr = depot.projects.retrieveProject(auth, "testie")
         val hist = depot.histories.retrieveHistory(auth, pr.name, "main")
-        val hver = depot.histories.retrieveHistoryStep(
+        val hVer = depot.histories.retrieveHistoryStep(
             auth,
             pr.name,
             hist.name
@@ -116,8 +120,8 @@ class DepotTest: TestStub() {
         val baselineVer = depot.artifacts.retrieveVersion(
             auth,
             pr.name,
-            hver.baselineId,
-            hver.baselineVersionId
+            hVer.baselineId,
+            hVer.baselineVersionId
         )
         val baseline = BaselineAgent.decodeFromString(baselineVer.content)
         val rootDirVer = depot.artifacts.retrieveVersion(
@@ -161,7 +165,7 @@ class DepotTest: TestStub() {
         val baselineVerFromStorage = depot.artifacts.retrieveVersion(
             auth,
             pr.name,
-            hver.baselineId,
+            hVer.baselineId,
             newBaselineVersion.id
         )
         val baselineFromStorage = BaselineAgent.decodeFromString(
@@ -198,7 +202,7 @@ class DepotTest: TestStub() {
 
         val pr = depot.projects.retrieveProject(auth, "testie")
         val hist = depot.histories.retrieveHistory(auth, pr.name, "main")
-        val hver = depot.histories.retrieveHistoryStep(
+        val hVer = depot.histories.retrieveHistoryStep(
             auth,
             pr.name,
             hist.name
@@ -206,8 +210,8 @@ class DepotTest: TestStub() {
         val baselineVer = depot.artifacts.retrieveVersion(
             auth,
             pr.name,
-            hver.baselineId,
-            hver.baselineVersionId
+            hVer.baselineId,
+            hVer.baselineVersionId
         )
         val baseline = BaselineAgent.decodeFromString(baselineVer.content)
         val rootDirVer = depot.artifacts.retrieveVersion(
@@ -294,15 +298,15 @@ class DepotTest: TestStub() {
             newBaselineVersion.id
         )
 
-        val rbaselineFromStorage = BaselineAgent.decodeFromString(
+        val rBaselineFromStorage = BaselineAgent.decodeFromString(
             baselineVerFromStorage.content
         )
 
-        val dirVersionId = rbaselineFromStorage.get(rbaselineFromStorage.rootDir)
+        val dirVersionId = rBaselineFromStorage.get(rBaselineFromStorage.rootDir)
         val dirVersionFromStorage = depot.artifacts.retrieveVersion(
             auth,
             pr.name,
-            rbaselineFromStorage.rootDir,
+            rBaselineFromStorage.rootDir,
             dirVersionId!!
         )
         val dirContents = DirectoryAgent.decodeFromString(
@@ -312,13 +316,13 @@ class DepotTest: TestStub() {
         assertNotNull(txtId)
 
         assertEquals(textArt.id, txtId)
-        assertEquals(textVer.id, rbaselineFromStorage.get(txtId))
+        assertEquals(textVer.id, rBaselineFromStorage.get(txtId))
 
         val txtFromStorage = depot.artifacts.retrieveVersion(
             auth,
             pr.name,
             txtId,
-            rbaselineFromStorage.get(txtId)!!
+            rBaselineFromStorage.get(txtId)!!
         )
         assertEquals("english", txtFromStorage.metadata["language"])
         assertEquals("aaa\nbbb\nccc\nddd\n", txtFromStorage.content)
@@ -330,7 +334,7 @@ class DepotTest: TestStub() {
         depot.projects.createProject(auth, "testie", "a test")
         val pr = depot.projects.retrieveProject(auth, "testie")
         val hist = depot.histories.retrieveHistory(auth, pr.name, "main")
-        val hver = depot.histories.retrieveHistoryStep(
+        val hVer = depot.histories.retrieveHistoryStep(
             auth,
             pr.name,
             hist.name,
@@ -338,8 +342,8 @@ class DepotTest: TestStub() {
         val baselineVer = depot.artifacts.retrieveVersion(
             auth,
             pr.name,
-            hver.baselineId,
-            hver.baselineVersionId
+            hVer.baselineId,
+            hVer.baselineVersionId
         )
         val baseline = BaselineAgent.decodeFromString(baselineVer.content)
         val rootDirVer = depot.artifacts.retrieveVersion(

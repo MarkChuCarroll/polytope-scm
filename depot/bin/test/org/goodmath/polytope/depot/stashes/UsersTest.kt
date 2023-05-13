@@ -15,8 +15,11 @@
  */
 package org.goodmath.polytope.depot.stashes
 
-import org.goodmath.polytope.PtException
-import org.goodmath.polytope.depot.Config
+import org.goodmath.polytope.Config
+import org.goodmath.polytope.common.PtException
+import org.goodmath.polytope.common.stashable.Action
+import org.goodmath.polytope.common.stashable.ActionLevel
+import org.goodmath.polytope.common.stashable.ActionScopeType
 import org.goodmath.polytope.depot.Depot
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
@@ -84,7 +87,7 @@ class UsersTest {
             listOf(Action(ActionScopeType.Project, "foo", ActionLevel.Write)),
             "tester tests")
         val tester = depot.users.authenticate("tester", "tester tests")
-        assertEquals(newUser.permissions, tester.permissions)
+        assertEquals(newUser.permittedActions, tester.permittedActions)
     }
 
     @Test

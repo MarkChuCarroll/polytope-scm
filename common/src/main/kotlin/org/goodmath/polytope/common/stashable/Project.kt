@@ -17,7 +17,8 @@ package org.goodmath.polytope.common.stashable
 
 import kotlinx.serialization.Serializable
 import org.goodmath.polytope.common.PtException
-
+import org.goodmath.polytope.common.util.toLocalDateTime
+import java.lang.StringBuilder
 
 enum class ProjectVersionSpecifierKind {
     History,
@@ -36,6 +37,26 @@ data class ProjectVersionSpecifier(
     val savePointId: Id<SavePoint>? = null,
     val number: Int?= null
 ) {
+
+    override fun toString(): String {
+        return when (kind) {
+            ProjectVersionSpecifierKind.History ->
+                if (number == null) {
+                    "history($project@$history)"
+                } else {
+                    "history($project@$history@$number)"
+                }
+
+            ProjectVersionSpecifierKind.Baseline ->
+                "baseline($project@$history@$baselineId)"
+
+            ProjectVersionSpecifierKind.Change ->
+                "change($project@$history@$changeName)"
+
+            ProjectVersionSpecifierKind.SavePoint ->
+                "savePoint($project@$history@$savePointId)"
+        }
+    }
 
     companion object {
         fun history(project: String, history: String, number: Int? = null): ProjectVersionSpecifier {
@@ -63,7 +84,7 @@ data class ProjectVersionSpecifier(
         fun fromString(s: String): ProjectVersionSpecifier {
             val matches = pvsRe.matchEntire(s) ?: throw PtException(
                 PtException.Kind.InvalidParameter,
-                "Invalid project version specifier"
+                "Invalid project version specifier: '${s}'"
             )
             val (kind, spec) = matches.destructured
             when (kind) {
@@ -145,4 +166,15 @@ data class Project(
     val rootDir: Id<Artifact>,
     val baseline: Id<Artifact>,
     val histories: List<Id<History>>
-)
+) {
+    fun render(): String {
+        val result = StringBuilder()
+        result.append("Project: $name\n")
+            .append("Created by $creator at ${toLocalDateTime(timestamp)}\n")
+            .append("Description: $description\n")
+            .append("Histories: ${histories.joinToString("'")}\n")
+            .append("Baseline: $baseline\n")
+            .append("Rootdir: $rootDir")
+        return result.toString()
+    }
+}

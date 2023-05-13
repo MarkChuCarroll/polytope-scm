@@ -196,7 +196,7 @@ fun Application.configureRouting() {
                 get("projects/{project}/histories") {
                     callWithAuthAndResultHandling(call, depot) { auth, depot, call ->
                         val projectName = call.parameters["name"]!!
-                        depot.histories.listHistories(auth, projectName)
+                        HistoryListResponse(depot.histories.listHistories(auth, projectName))
                     }
                 }
 
@@ -223,18 +223,27 @@ fun Application.configureRouting() {
                     callWithAuthAndResultHandling(call, depot) { auth, depot, call ->
                         val projectName = call.parameters["project"]!!
                         val historyName = call.parameters["history"]!!
-                        depot.histories.listHistorySteps(
+                        HistoryStepsResponse(depot.histories.listHistorySteps(
                             auth, projectName,
                             historyName
-                        )
+                        ))
                     }
                 }
 
                 get("projects/{project}/histories/{history}/changes") {
                     callWithAuthAndResultHandling(call, depot) { auth, depot, call ->
+                        val showStr = call.request.queryParameters["show"]?:"open"
+                        val show = when(showStr) {
+                            "aborted", "all" -> ChangeStatus.Aborted
+                            "closed" -> ChangeStatus.Closed
+                                "open" -> ChangeStatus.Open
+                            else ->
+                                throw PtException(PtException.Kind.InvalidParameter,
+                                    "status for a change list must be one of ('all', 'aborted', 'closed', 'open')")
+                        }
                         val project = call.parameters["project"]!!
                         val history = call.parameters["history"]!!
-                        depot.changes.listChanges(auth, project, history)
+                        ChangeListResponse(depot.changes.listChanges(auth, project, history, show))
                     }
                 }
 
@@ -247,13 +256,24 @@ fun Application.configureRouting() {
                     }
                 }
 
+                delete("projects/{project}/histories/{history}/changes/{change}") {
+                    callWithAuthAndResultHandling(call, depot) { auth, depot, call ->
+                        val project = call.parameters["project"]!!
+                        val history = call.parameters["history"]!!
+                        val change = call.parameters["change"]!!
+                        val theChange = depot.changes.retrieveChangeByName(auth, project, history, change).copy(status=ChangeStatus.Aborted)
+                        depot.changes.updateChangeStatus(auth, project, history, change, ChangeStatus.Aborted)
+                        theChange
+                    }
+                }
+
 
                 get("projects/{project}/histories/{history}/changes/{change}/saves") {
                     callWithAuthAndResultHandling(call, depot) { auth, depot, call ->
                         val project = call.parameters["project"]!!
                         val history = call.parameters["history"]!!
                         val change = call.parameters["change"]!!
-                        depot.changes.listSavePoints(auth, project, history, change)
+                        SavesListResponse(depot.changes.listSavePoints(auth, project, history, change))
                     }
                 }
 
@@ -265,7 +285,7 @@ fun Application.configureRouting() {
                 get("projects/{project}/workspaces") {
                     callWithAuthAndResultHandling(call, depot) { auth, depot, call ->
                         val project = call.parameters["project"]!!
-                        depot.workspaces.listWorkspaces(auth, project)
+                        WorkspaceListResponse(depot.workspaces.listWorkspaces(auth, project))
                     }
                 }
 
@@ -301,7 +321,7 @@ fun Application.configureRouting() {
                         val req = call.receive<WorkspaceCreateChangeRequest>()
                         val ws = depot.workspaces.retrieveWorkspace(auth, project, workspace)
                         depot.workspaces.createChange(
-                            auth, ws, req.name,
+                            auth, ws, req.history, req.changeName,
                             req.description
                         )
                     }
@@ -313,7 +333,8 @@ fun Application.configureRouting() {
                         val workspace = call.parameters["workspace"]!!
                         val change = call.parameters["change"]!!
                         val ws = depot.workspaces.retrieveWorkspace(auth, project, workspace)
-                        depot.workspaces.openChange(auth, ws, ws.history, change)
+                        val history = call.request.queryParameters["history"]?:ws.history
+                        depot.workspaces.openChange(auth, ws, history, change)
                         ws
                     }
                 }
@@ -334,7 +355,7 @@ fun Application.configureRouting() {
                         val project = call.parameters["project"]!!
                         val workspace = call.parameters["workspace"]!!
                         val ws = depot.workspaces.retrieveWorkspace(auth, project, workspace)
-                        depot.workspaces.listPaths(auth, ws)
+                        PathListResponse(depot.workspaces.listPaths(auth, ws))
                     }
                 }
 
@@ -440,13 +461,24 @@ fun Application.configureRouting() {
                     }
                 }
 
-                post("projects/{project}/workspaces/{workspace}/action/integrate") {
+                post("projects/{project}/workspaces/{workspace}/action/integrateChange") {
                     callWithAuthAndResultHandling(call, depot) { auth, depot, call ->
                         val project = call.parameters["project"]!!
                         val workspace = call.parameters["workspace"]!!
                         val ws = depot.workspaces.retrieveWorkspace(auth, project, workspace)
-                        val req = call.receive<WorkspaceIntegrateRequest>()
-                        depot.workspaces.integrate(auth, ws, req.fromVersion, req.toVersion)
+                        val req = call.receive<WorkspaceIntegrateChangeRequest>()
+                        depot.workspaces.integrateChange(auth, ws, req.sourceHistory, req.changeName)
+                        ws
+                    }
+                }
+
+                post("projects/{project}/workspaces/{workspace}/action/integrateDiff") {
+                    callWithAuthAndResultHandling(call, depot) { auth, depot, call ->
+                        val project = call.parameters["project"]!!
+                        val workspace = call.parameters["workspace"]!!
+                        val ws = depot.workspaces.retrieveWorkspace(auth, project, workspace)
+                        val req = call.receive<WorkspaceIntegrateDiffRequest>()
+                        depot.workspaces.integrateDiff(auth, ws, req.fromVersion, req.toVersion)
                         ws
                     }
                 }
@@ -461,13 +493,13 @@ fun Application.configureRouting() {
                     }
                 }
 
-                post("projects/{project}/workspaces/{workspace}/action/abandon") {
+                post("projects/{project}/workspaces/{workspace}/action/reset") {
                     callWithAuthAndResultHandling(call, depot) { auth, depot, call ->
                         val project = call.parameters["project"]!!
                         val workspace = call.parameters["workspace"]!!
-                        val reason = call.receiveText()
+                        val req = call.receive<WorkspaceResetRequest>()
                         val ws = depot.workspaces.retrieveWorkspace(auth, project, workspace)
-                        depot.workspaces.abandonChanges(auth, ws, reason)
+                        depot.workspaces.abandonChanges(auth, ws, req.reason, req.stepIndex)
                         ws
                     }
                 }

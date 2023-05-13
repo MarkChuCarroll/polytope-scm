@@ -48,7 +48,7 @@ class WorkspaceBasicsTest: TestStub() {
             user, "test", "main", "mytest",
             "a test workspace"
         )
-        val ch = depot.workspaces.createChange(user, ws,"test-change", "just a test")
+        val ch = depot.workspaces.createChange(user, ws, "main", "test-change", "just a test")
         val newFileId = depot.workspaces.addFile(user, ws, "foo", TextAgent.artifactType, TextAgent.encodeToString(Text(listOf("11\n", "22\n", "33\n"))))
         val sp = depot.workspaces.save(user, ws,"test", emptyList())
 
@@ -71,7 +71,7 @@ class WorkspaceBasicsTest: TestStub() {
             user, "test", "main", "mytest",
             "a test workspace"
         )
-        depot.workspaces.createChange(user, ws,"test-change", "just a test")
+        depot.workspaces.createChange(user, ws,"main", "test-change", "just a test")
         val dirDir = depot.workspaces.addFile(user, ws,"dir", DirectoryAgent.artifactType, DirectoryAgent.encodeToString(
             Directory()
         ))

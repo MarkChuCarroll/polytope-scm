@@ -16,7 +16,8 @@
 package org.goodmath.polytope.depot.stashes
 
 import org.goodmath.polytope.TestStub
-import org.goodmath.polytope.depot.agents.BaselineAgent
+import org.goodmath.polytope.common.agents.BaselineAgent
+import org.goodmath.polytope.common.stashable.Project
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow

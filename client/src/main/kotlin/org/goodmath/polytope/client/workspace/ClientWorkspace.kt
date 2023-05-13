@@ -1,11 +1,9 @@
 package org.goodmath.polytope.client.workspace
 
-import org.goodmath.polytope.client.ClientConfig
-import org.goodmath.polytope.client.rest.RestApiClient
+import org.goodmath.polytope.client.api.RestApiClient
 import org.goodmath.polytope.common.stashable.Workspace
 import maryk.rocksdb.RocksDB
 import maryk.rocksdb.openRocksDB
-import org.goodmath.polytope.client.ClientException
 import org.goodmath.polytope.common.PtException
 import org.goodmath.polytope.common.WorkspaceFileContents
 import org.goodmath.polytope.common.agents.text.TextAgent
@@ -39,7 +37,9 @@ data class StateMap(
 ) {
     val paths: Set<String>
         get() = fileStates.keys
+
     operator fun get(path: String): FileState? = fileStates[path]
+
     operator fun set(path: String, state: FileState) {
         fileStates[path] = state
     }
@@ -69,7 +69,8 @@ data class FileChanges(
     val deletedFiles: List<String>
 )
 
-class ClientWorkspace(cfg: ClientConfig) {
+class ClientWorkspace(cfg: ClientConfig, val name: String) {
+
 
     /**
      * List the paths of all tracked files in the workspace
@@ -87,7 +88,7 @@ class ClientWorkspace(cfg: ClientConfig) {
      */
     suspend fun populate(newState: Workspace) {
         val stateMap = getStateMap()
-        val paths = apiClient.workspaceListPaths(newState.project, newState.name)
+        val paths = apiClient.workspaceListPaths(newState.project, newState.name).paths
         val newStateMap = StateMap(mutableMapOf())
         for (p in paths) {
             // For a first pass, we'll only deal with text files.
@@ -123,13 +124,48 @@ class ClientWorkspace(cfg: ClientConfig) {
         saveState(newState, newStateMap)
     }
 
-    suspend fun addFile(path: String) {
+    private fun requireChange(wsState: Workspace) {
+        if (wsState.change == null) {
+            throw PtException(PtException.Kind.UserError,
+                "Modifications can't be made in the workspace without an open change")
+        }
+    }
+
+    private fun findAllRecursive(dir: File): List<String> {
+        val result: MutableList<String> = arrayListOf()
+        val children = dir.listFiles()!!
+        for (child in children) {
+            if (child.isDirectory) {
+                result.addAll(findAllRecursive(child))
+            } else {
+                result.add(child.toString())
+            }
+        }
+        return result
+    }
+
+    suspend fun addFiles(paths: List<String>, recursive: Boolean) {
         val stateMap = getStateMap()
         val wsState = getState()
-        val content = WorkspaceFileContents(path, TextAgent.artifactType, File(path).readText())
-        val updated = apiClient.workspaceAddFile(wsState.project, wsState.name, path,
-                content)
-        stateMap[path] = FileState(path, computeHash(StringReader(content.content)))
+        requireChange(wsState)
+        val pathsToAdd = arrayListOf<String>()
+        for (p in paths) {
+            val pathFile = File(p)
+            if (pathFile.isDirectory) {
+                if (recursive) {
+                    pathsToAdd.addAll(findAllRecursive(pathFile))
+                }
+            }
+        }
+        var updated: Workspace = wsState
+        for (p in pathsToAdd) {
+            val content = WorkspaceFileContents(p, TextAgent.artifactType, File(p).readText())
+            updated = apiClient.workspaceAddFile(
+                wsState.project, wsState.name, p,
+                content
+            )
+            stateMap[p] = FileState(p, computeHash(StringReader(content.content)))
+        }
         saveState(updated, stateMap)
     }
 
@@ -140,6 +176,7 @@ class ClientWorkspace(cfg: ClientConfig) {
                     "File $path not found in workspace")
         }
         val wsState = getState()
+        requireChange(wsState)
         val deleted = apiClient.workspaceDeleteFile(wsState.project, wsState.name,
                 path)
         if (really) {
@@ -154,32 +191,58 @@ class ClientWorkspace(cfg: ClientConfig) {
     }
 
     suspend fun moveFile(fromPath: String, toPath: String) {
-        val ws = getState()
+        val wsState = getState()
+        requireChange(wsState)
         val updated = apiClient.workspaceMoveFile(
-                ws.project, ws.name, fromPath, toPath)
+                wsState.project, wsState.name, fromPath, toPath)
         populate(updated)
     }
 
-    suspend fun setChange(changeName: String) {
-        val ws = getState()
-        if (ws.modifiedArtifacts.isNotEmpty()) {
+    suspend fun openHistory(history: String) {
+        ensureUnchanged()
+        val updated = apiClient.historyOpen(project, name, history)
+        populate(updated)
+    }
+
+    suspend fun openChange(history: String, changeName: String) {
+        val wsState = getState()
+        if (wsState.modifiedArtifacts.isNotEmpty()) {
             throw PtException(PtException.Kind.Constraint,
-                    "Can't set change: The workspace contains unsaved changes")
+                    "Can't open a new change: The workspace contains unsaved changes")
         }
-        // TODO
+        val updatedWs = apiClient.workspaceOpenChange(wsState.project, wsState.name, history, changeName)
+        populate(updatedWs)
+    }
+
+    suspend fun reset(reason: String, stepIndex: Int? = null) {
+        val ws = getState()
+        requireChange(ws)
+        val updated = apiClient.workspaceReset(ws.project, ws.name, reason, stepIndex)
+        populate(updated)
+    }
+
+    fun ensureUnchanged() {
+        val wsState = getState()
+        val changes = findChanges()
+        if (wsState.workingVersions.isNotEmpty() || wsState.modifiedArtifacts.isNotEmpty() ||
+            changes.deletedFiles.isNotEmpty() || changes.modifiedFiles.isNotEmpty()) {
+            throw PtException(PtException.Kind.UserError,
+                "Workspace contains unsaved changes")
+        }
+
     }
 
     suspend fun save(desc: String, resolved: List<String>) {
-        val ws = getState()
+        val wsState = getState()
         val changes = findChanges()
         for (d in changes.deletedFiles) {
-            apiClient.workspaceDeleteFile(ws.project, ws.name, d)
+            apiClient.workspaceDeleteFile(wsState.project, wsState.name, d)
         }
         for (m in changes.modifiedFiles) {
             val f = WorkspaceFileContents(m, TextAgent.artifactType, File(m).readText())
-            apiClient.workspaceModifyFile(ws.project, ws.name, m, f.content)
+            apiClient.workspaceModifyFile(wsState.project, wsState.name, m, f.content)
         }
-        val updated = apiClient.workspaceSave(ws.project, ws.name, desc, resolved)
+        val updated = apiClient.workspaceSave(wsState.project, wsState.name, desc, resolved)
         populate(updated)
     }
 
@@ -242,8 +305,19 @@ class ClientWorkspace(cfg: ClientConfig) {
         return wsState!!
     }
 
+    val history: String
+        get() = getState().history
+
+    val project: String
+        get() = getState().project
+
+    val change: String?
+        get() = getState().change
+
+
     private var wsState: Workspace? = null
-    private val apiClient = RestApiClient(cfg.serverUrl, cfg.userId, cfg.password)
+    val apiClient = RestApiClient(cfg.serverUrl, cfg.userId, cfg.password ?: throw PtException(PtException.Kind.UserError,
+        "Workspace config must contain a password"))
     private val stateDbPath = cfg.wsPath / ".polytope" / "wsDb"
     private val stateDb: RocksDB = openRocksDB(stateDbPath.toString())
 
@@ -254,13 +328,13 @@ class ClientWorkspace(cfg: ClientConfig) {
             // Create the WS directory, if it doesn't already exist.
             if (!cfg.wsPath.exists()) {
                 if (!cfg.wsPath.toFile().mkdirs()) {
-                    throw ClientException("creating workspace", "could not create workspace directory")
+                    throw PtException(PtException.Kind.Permission, "could not create workspace directory")
                 }
             }
             // Create the .polytope state directory.
             val ptDirPath = cfg.wsPath / ".polytope"
             if (ptDirPath.exists()) {
-                throw ClientException("creating workspace", "workspace already exists")
+                throw PtException(PtException.Kind.Conflict, "workspace already exists")
             }
             ptDirPath.toFile().mkdirs()
             // create the local DB.
@@ -270,7 +344,7 @@ class ClientWorkspace(cfg: ClientConfig) {
             db.putTyped(workspaceRecordKey, initial)
             db.putTyped(stateMapKey, StateMap(hashMapOf()))
             // populate the workspace.
-            val cWorkspace = ClientWorkspace(cfg)
+            val cWorkspace = ClientWorkspace(cfg, initial.name)
             cWorkspace.populate(initial)
             return cWorkspace
         }

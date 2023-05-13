@@ -16,6 +16,8 @@
 package org.goodmath.polytope.common.stashable
 
 import kotlinx.serialization.Serializable
+import org.goodmath.polytope.common.util.toLocalDateTime
+import java.lang.StringBuilder
 
 enum class ChangeStatus {
     Open,
@@ -35,7 +37,19 @@ data class Change(
     val baseline: Id<ArtifactVersion>,
     val savePoints: List<Id<SavePoint>>,
     val status: ChangeStatus
-)
+) {
+    fun render(): String {
+        val ts = toLocalDateTime(timestamp)
+        val result = StringBuilder()
+
+        result.append("Change: ${project}::${history}::${name} [Status: ${status}\n")
+            .append("Description: ${description}\n")
+            .append("Basis: ${basis}\n")
+            .append("Created at: $ts\n")
+            .append("Contains ${savePoints.size} savepoints\n")
+        return result.toString()
+    }
+}
 
 @Serializable
 data class SavePoint(
@@ -47,4 +61,14 @@ data class SavePoint(
     val baselineVersion: Id<ArtifactVersion>,
     val modifiedArtifacts: List<Id<Artifact>>,
     val timestamp: Long
-)
+) {
+    fun render(): String {
+        val ts = toLocalDateTime(timestamp)
+        val result = StringBuilder()
+        result.append("SavePoint: ${id} < ${basis}\n")
+            .append("Created by: ${creator} at $ts\n")
+            .append("Changes: ${modifiedArtifacts.joinToString(", ")}\n")
+        return result.toString()
+
+    }
+}

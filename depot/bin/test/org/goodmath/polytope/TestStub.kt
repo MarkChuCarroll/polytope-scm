@@ -16,12 +16,11 @@
 
 package org.goodmath.polytope
 
-import org.goodmath.polytope.depot.Config
+import org.goodmath.polytope.common.stashable.Action
+import org.goodmath.polytope.common.stashable.ActionLevel
+import org.goodmath.polytope.common.stashable.ActionScopeType
+import org.goodmath.polytope.common.stashable.AuthenticatedUser
 import org.goodmath.polytope.depot.Depot
-import org.goodmath.polytope.depot.stashes.Action
-import org.goodmath.polytope.depot.stashes.ActionLevel
-import org.goodmath.polytope.depot.stashes.ActionScopeType
-import org.goodmath.polytope.depot.stashes.AuthenticatedUser
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import java.io.File
@@ -61,11 +60,8 @@ open class TestStub {
         user = depot.users.authenticate("tester", "tester tests")
     }
 
-
     @AfterEach
     fun close() {
         depot.close()
     }
-
-
 }

@@ -16,7 +16,6 @@
 
 package org.goodmath.polytope.client.workspace
 
-import maryk.rocksdb.ColumnFamilyHandle
 import maryk.rocksdb.RocksDB
 import maryk.rocksdb.WriteBatch
 import org.goodmath.polytope.common.util.ParsingCommons
@@ -26,7 +25,9 @@ import kotlin.text.Charsets.UTF_8
 
 
 // A collection of extension functions for RocksDB to make code that saves and retrieves
-// typed data cleaner.
+// typed data cleaner. It's annoying, but due to the way that kotlin and gradle handle
+// extension functions with reified types, this needs to be duplicated from the server
+// instead of being shared in common.
 
 /**
  * A version of rocksdb "put" that takes strings for the key and value instead of
@@ -39,29 +40,11 @@ fun RocksDB.put(key: String, value: String) {
 }
 
 /**
- * A version of rocksdb "put" that takes strings for the key and value instead of
- * byte arrays.
- */
-fun RocksDB.put(cf: ColumnFamilyHandle, key: String, value: String) {
-    val keyBytes = key.toByteArray(UTF_8)
-    val valueBytes = value.toByteArray(UTF_8)
-    this.put(cf, keyBytes, valueBytes)
-}
-
-/**
  * A version of rocksdb "put" that takes a typed value, and stores
  * it as rendered json.
  */
 fun<T> RocksDB.putTyped(key: String, value: T) {
     this.put(key, ParsingCommons.klaxon.toJsonString(value))
-}
-
-/**
- * A version of rocksdb "put" that takes a typed value, and stores
- * it as rendered json.
- */
-fun<T> RocksDB.putTyped(cf: ColumnFamilyHandle, key: String, value: T) {
-    this.put(cf, key, ParsingCommons.klaxon.toJsonString(value))
 }
 
 
@@ -70,13 +53,6 @@ fun<T> RocksDB.putTyped(cf: ColumnFamilyHandle, key: String, value: T) {
  * the old value, and writing the new one, using the typed value
  * mechanism from above.
  */
-fun<T> RocksDB.updateTyped(cf: ColumnFamilyHandle, key: String, value: T) {
-    val wb = WriteBatch()
-    wb.delete(cf, key.toByteArray())
-    wb.putTyped(cf, key, value)
-    this.write(WriteOptions(), wb)
-}
-
 fun<T> RocksDB.updateTyped(key: String, value: T) {
     val wb = WriteBatch()
     wb.delete(key.toByteArray())
@@ -88,10 +64,6 @@ fun<T> RocksDB.updateTyped(key: String, value: T) {
  * For clean updates, this is a helper that lets you use putTyped
  * in a batch.
   */
-fun<T> WriteBatch.putTyped(cf: ColumnFamilyHandle, key: String, value: T) {
-    this.put(cf, key.toByteArray(UTF_8), ParsingCommons.klaxon.toJsonString(value).toByteArray(UTF_8))
-}
-
 fun<T> WriteBatch.putTyped(key: String, value: T) {
     this.put(key.toByteArray(UTF_8), ParsingCommons.klaxon.toJsonString(value).toByteArray(UTF_8))
 }
@@ -111,34 +83,3 @@ inline fun<reified T> RocksDB.getTyped(key: String): T? {
     }
 }
 
-/**
- * The counterpart to typed get. This will read a json string from
- * the DB, and then parse it into a typed value using kotlin serialization + klaxon.
- */
-inline fun<reified T> RocksDB.getTyped(cf: ColumnFamilyHandle, key: String): T? {
-    val keyBytes = key.toByteArray(UTF_8)
-    return this.get(cf, keyBytes)?.let {
-        ParsingCommons.klaxon.parse<T>(it)
-    }
-}
-
-/**
- * A wrapper around the rocksDB iterator to convert it into a
- * Kotlin list of typed values.
- */
-inline fun<reified T> RocksDB.listAllInColumn(
-    cf: ColumnFamilyHandle,
-    pred: (T) -> Boolean = {_: T -> true}): List<T> {
-    val iter = this.newIterator(cf)
-    val result: MutableList<T> = mutableListOf()
-    iter.seekToFirst()
-    while (iter.isValid) {
-        val next = ParsingCommons.klaxon.parse<T>(iter.value())
-        if (next != null && pred(next)) {
-            result.add(next)
-        }
-        iter.next()
-    }
-    iter.close()
-    return result
-}

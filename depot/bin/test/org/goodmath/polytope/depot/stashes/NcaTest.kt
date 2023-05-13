@@ -1,9 +1,12 @@
 package org.goodmath.polytope.depot.stashes
 
 import org.goodmath.polytope.TestStub
+import org.goodmath.polytope.common.agents.text.TextAgent
+import org.goodmath.polytope.common.stashable.Artifact
+import org.goodmath.polytope.common.stashable.ArtifactVersion
+import org.goodmath.polytope.common.stashable.AuthenticatedUser
+import org.goodmath.polytope.common.stashable.Id
 import org.goodmath.polytope.depot.Depot
-import org.goodmath.polytope.depot.agents.text.TextAgent
-import org.goodmath.polytope.depot.util.Id
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import kotlin.test.assertFalse
@@ -12,20 +15,20 @@ import kotlin.test.assertTrue
 class NcaTest: TestStub() {
 
 
-    lateinit var aVer: ArtifactVersion
-    lateinit var bVer: ArtifactVersion
-    lateinit var cVer: ArtifactVersion
-    lateinit var dVer: ArtifactVersion
-    lateinit var eVer: ArtifactVersion
-    lateinit var fVer: ArtifactVersion
-    lateinit var gVer: ArtifactVersion
-    lateinit var hVer: ArtifactVersion
-    lateinit var iVer: ArtifactVersion
-    lateinit var jVer: ArtifactVersion
-    lateinit var kVer: ArtifactVersion
-    lateinit var lVer: ArtifactVersion
+    private lateinit var aVer: ArtifactVersion
+    private lateinit var bVer: ArtifactVersion
+    private lateinit var cVer: ArtifactVersion
+    private lateinit var dVer: ArtifactVersion
+    private lateinit var eVer: ArtifactVersion
+    private lateinit var fVer: ArtifactVersion
+    private lateinit var gVer: ArtifactVersion
+    private lateinit var hVer: ArtifactVersion
+    private lateinit var iVer: ArtifactVersion
+    private lateinit var jVer: ArtifactVersion
+    private lateinit var kVer: ArtifactVersion
+    private lateinit var lVer: ArtifactVersion
 
-    fun buildArtifactHistory(
+    private fun buildArtifactHistory(
         auth: AuthenticatedUser,
         depot: Depot,
         artifactId: Id<Artifact>,

@@ -76,8 +76,9 @@ The supported nouns are:
 - Project
 - History
 - Change
-- Workspace
+- Workspace (ws) 
 - User
+- File
 
 
 ### Verbs for project
@@ -96,36 +97,42 @@ List the projects available on the server.
 
 #### Show a specific project
 
-> pt project get _projectname_
+> pt project get _project_name_
 
 ### Verbs for History
 
 #### List histories
 
-> pt history liste --project=_projectname_
+> pt history list --project=_project_name_
 
 #### Create a new history
 
-> pt history create --project=_projectname_ --from-history=_source_history [ --from-history-version=_index_] _new_history_name
+> pt history create --project=_project_name_ --from-history=_source_history [ --from-history-version=_index_] _new_history_name
 
 #### View the versions in a history
 
-> pt history versions --project=_projectname_ --history=_history_name_
+> pt history versions --project=_project_name_ --history=_history_name_
+
+#### Select a history for work in a workspace
+
+> pt history select _history_name_ 
+
+**Note**: This command can only be run in a workspace.
 
 ### Verbs for Change
 
 #### Create a new change
 
-> pt change create --project=_projectname_ [--history=_historyname_] --name=_nem_change_name
+> pt change create --project=_project_name_ [--history=_history_name_] _new_change_name_
 
 If the command is run in a workspace, and the parent history isn't
 supplied, then it will default to the current history open in the workspace. 
-If it's not run in a workspace, then it's an error to ommit 
+If it's not run in a workspace, then it's an to omit the project and history.
 
 
 #### Open an existing change in a workspace
 
-**Note**: This command can only be run inside of a workspace.
+**Note**: This command can only be run in a workspace.
 
 > p change open --name=change_name [--history=_history_name_]
 

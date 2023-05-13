@@ -16,6 +16,8 @@
 package org.goodmath.polytope.common.stashable
 
 import org.goodmath.polytope.common.agents.MergeConflict
+import org.goodmath.polytope.common.util.toLocalDateTime
+import java.lang.StringBuilder
 
 data class WorkspaceDescriptor(
     val id: Id<Workspace>,
@@ -25,7 +27,17 @@ data class WorkspaceDescriptor(
     val description: String,
     val createdAt: Long,
     val lastModified: Long
-)
+) {
+    fun render(): String {
+        val created = toLocalDateTime(createdAt)
+        val modified = toLocalDateTime(lastModified)
+        val result = StringBuilder()
+        result.append("Workspace: $project::$wsName\n")
+            .append("Created at: $created by: $creator\n")
+            .append("Description: $description\n")
+        return result.toString()
+    }
+}
 
 data class Workspace(
     val id: Id<Workspace>,
@@ -43,4 +55,21 @@ data class Workspace(
     val workingVersions: MutableMap<Id<Artifact>, Id<ArtifactVersion>>,
     val modifiedArtifacts: MutableSet<Id<Artifact>> = HashSet(),
     val conflicts: MutableList<MergeConflict> = arrayListOf()
-)
+) {
+    fun render(): String {
+        val created = toLocalDateTime(createdAt)
+        val modified = toLocalDateTime(lastModified)
+        val result = StringBuilder()
+        result.append("Workspace: $project::$name\n")
+            .append("Created at: $created by: $creator\n")
+            .append("Description: $description\n")
+            .append("Basis: $basis\n")
+            .append("Conflicts:\n")
+        for (c in conflicts) {
+            result.append(c.render(indent=1))
+            result.append("\t----")
+        }
+        return result.toString()
+    }
+
+}
