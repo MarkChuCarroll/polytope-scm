@@ -24,7 +24,7 @@ import com.github.ajalt.clikt.parameters.types.choice
 import kotlinx.coroutines.runBlocking
 import org.goodmath.polytope.client.api.RestApiClient
 
-class ProjectCommand : PolytopeCommandBase("project", "work with projects") {
+class ProjectCommand : PolytopeCommandBase("project", "Manipulate projects in a polytope depot.") {
     override fun run() {
     }
 
@@ -40,7 +40,7 @@ class ProjectCommand : PolytopeCommandBase("project", "work with projects") {
 
 }
 
-class ProjectCreateCommand : PolytopeCommandBase("create", "create a new project") {
+class ProjectCreateCommand : PolytopeCommandBase("create", "Create a new project.") {
     private val username: String? by option("-u", "--user", help = "the id of the user")
     private val serverUrl: String? by option("-s", "--server", help = "the URL of the polytope depot server")
     private val description: String by option(
@@ -48,7 +48,7 @@ class ProjectCreateCommand : PolytopeCommandBase("create", "create a new project
         "--description",
         help = "a short description of the new project"
     ).required()
-    private val name: String by argument()
+    private val name: String by argument(help = "the name of the new project")
     override fun run() {
         handleCommandErrors("project", "create") {
             val user = username ?: requireUserId()
@@ -65,7 +65,7 @@ class ProjectCreateCommand : PolytopeCommandBase("create", "create a new project
 class ProjectListCommand : PolytopeCommandBase("list", "list projects in the depot") {
     private val username: String? by option("-u", "--user", help = "the id of the user")
     private val serverUrl: String? by option("-s", "--server", help = "the URL of the polytope server")
-    private val format: String by option("--format").choice("text", "json").default("text")
+    private val format: String by option("-f", "--format").choice("text", "json").default("text")
 
     override fun run() {
         handleCommandErrors("project", "list") {
@@ -91,7 +91,7 @@ class ProjectListCommand : PolytopeCommandBase("list", "list projects in the dep
 class ProjectGetCommand : PolytopeCommandBase("get", help = "get information about a project") {
     private val username: String? by option("-u", "--user", help = "the id of the user")
     private val serverUrl: String? by option("-s", "--server", help = "the URL of the polytope server")
-    private val format: String by option("--format").choice("text", "json").default("text")
+    private val format: String by option("-f", "--format").choice("text", "json").default("text")
     private val project: String by argument(help = "the name of the project")
     override fun run() {
         handleCommandErrors("project", "get") {
@@ -103,8 +103,8 @@ class ProjectGetCommand : PolytopeCommandBase("get", help = "get information abo
                 apiClient.projectGet(project)
             }
 
-             if (format == "text") {
-                 echo(theProject.toString())
+            if (format == "text") {
+                echo(theProject.toString())
             } else {
                 echo(prettyJson(theProject))
             }

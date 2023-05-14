@@ -70,7 +70,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("org.goodmath.polytope.client.cli.CommandLineKt")
+    mainClass.set("org.goodmath.polytope.client.commands.CommandLineKt")
 }
 
 tasks.named<Test>("test") {

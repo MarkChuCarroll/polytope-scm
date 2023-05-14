@@ -23,6 +23,14 @@ open class PtException(
     val msg: String,
     override val cause: Throwable? = null): Exception("Error($kind): $msg", cause) {
 
+    override fun toString(): String {
+        var result = "${kind.errorPrefix()}$msg"
+        if (cause != null) {
+            result += "\nCaused by: $cause"
+        }
+        return result
+    }
+
     enum class Kind {
         Internal, // Error 121 (EREMOTEIO)
         InvalidParameter, // error 22 (EINVAL)
@@ -49,6 +57,21 @@ open class PtException(
                 TypeError -> 34
                 UserError -> 1
                 Client -> 10
+            }
+
+        fun errorPrefix() =
+            when(this) {
+                Internal -> "Internal Error: "
+                InvalidParameter -> "Invalid parameter: "
+                Permission -> "Permission error: "
+                NotFound -> "Not found: "
+                Conflict -> "Error:  "
+                Authentication -> "Authentication error: "
+                Parsing -> "Syntax error: "
+                Constraint -> "Constraint violation: "
+                TypeError -> "Type error: "
+                UserError -> "Error: "
+                Client -> "Client error: "
             }
 
         companion object {

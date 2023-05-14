@@ -43,7 +43,7 @@ fun RocksDB.put(key: String, value: String) {
  * A version of rocksdb "put" that takes a typed value, and stores
  * it as rendered json.
  */
-fun<T> RocksDB.putTyped(key: String, value: T) {
+fun <T> RocksDB.putTyped(key: String, value: T) {
     this.put(key, ParsingCommons.klaxon.toJsonString(value))
 }
 
@@ -53,7 +53,7 @@ fun<T> RocksDB.putTyped(key: String, value: T) {
  * the old value, and writing the new one, using the typed value
  * mechanism from above.
  */
-fun<T> RocksDB.updateTyped(key: String, value: T) {
+fun <T> RocksDB.updateTyped(key: String, value: T) {
     val wb = WriteBatch()
     wb.delete(key.toByteArray())
     wb.putTyped(key, value)
@@ -63,8 +63,8 @@ fun<T> RocksDB.updateTyped(key: String, value: T) {
 /**
  * For clean updates, this is a helper that lets you use putTyped
  * in a batch.
-  */
-fun<T> WriteBatch.putTyped(key: String, value: T) {
+ */
+fun <T> WriteBatch.putTyped(key: String, value: T) {
     this.put(key.toByteArray(UTF_8), ParsingCommons.klaxon.toJsonString(value).toByteArray(UTF_8))
 }
 
@@ -73,7 +73,7 @@ fun<T> WriteBatch.putTyped(key: String, value: T) {
  * The counterpart to typed get. This will read a json string from
  * the DB, and then parse it into a typed value using kotlin serialization + klaxon.
  */
-inline fun<reified T> RocksDB.getTyped(key: String): T? {
+inline fun <reified T> RocksDB.getTyped(key: String): T? {
     val keyBytes = key.toByteArray(UTF_8)
     val resultBytes = this.get(keyBytes)
     return if (resultBytes != null) {

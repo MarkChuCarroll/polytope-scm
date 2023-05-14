@@ -26,7 +26,7 @@ import org.goodmath.polytope.client.api.RestApiClient
 import org.goodmath.polytope.common.PtException
 import org.goodmath.polytope.common.stashable.ProjectVersionSpecifier
 
-class ChangeCommand : PolytopeCommandBase("change", "work with changes") {
+class ChangeCommand : PolytopeCommandBase("change", "Manipulate changes in a polytope depot.") {
     override fun run() {
     }
 
@@ -47,12 +47,15 @@ class ChangeCommand : PolytopeCommandBase("change", "work with changes") {
     }
 }
 
-class ChangeCreateCommand : PolytopeCommandBase("create", help = "create a change in this workspace") {
-    private val name: String by option("--name", help = "The name of the new change").required()
-    private val description: String by option("-d", "--description", help = "A short description of the change").required()
+class ChangeCreateCommand : PolytopeCommandBase("create", help = "Create a change in the current workspace.") {
+    private val name: String by option("-n", "--name", help = "the name of the new change").required()
+    private val description: String by option(
+        "-d",
+        "--description",
+        help = "a short description of the change"
+    ).required()
     private val parentHistory: String? by option(
-        "-h", "--history", help = "The history that will contain the change. " +
-                "Default is the history currently populating the workspace."
+        "-h", "--history", help = "the history that will contain the change. "
     )
 
     override fun run() {
@@ -69,9 +72,9 @@ class ChangeCreateCommand : PolytopeCommandBase("create", help = "create a chang
 
 }
 
-class ChangeOpenCommand : PolytopeCommandBase("open", help = "open a change in this workspace") {
-    private val historyName: String? by option("--history", help="The name of the history containing the change")
-    private val changeName: String by option("--name", help = "The name of the existing change").required()
+class ChangeOpenCommand : PolytopeCommandBase("open", help = "Open a change in the current workspace") {
+    private val historyName: String? by option("--history", help = "the name of the history containing the change")
+    private val changeName: String by option("--name", help = "the name of the existing change").required()
 
     override fun run() {
         handleCommandErrors("change", "open") {
@@ -87,14 +90,14 @@ class ChangeOpenCommand : PolytopeCommandBase("open", help = "open a change in t
 }
 
 
-class ChangeListCommand : PolytopeCommandBase("list", "list changes open in a history") {
-    private val project: String? by option("--project", help = "The project containing the history")
-    private val history: String? by option("--history", help = "The history containing the change")
-    private val usernameArg: String? by option("--user", help = "The userId of the user performing the command")
-    private val serverUrlArg: String? by option("--server", help = "The URL of the polytope server")
-    private val show: String by option("--show", help = "The minimum status to include in the list")
+class ChangeListCommand : PolytopeCommandBase("list", "List the changes in a history.") {
+    private val project: String? by option("--project", help = "the project containing the history")
+    private val history: String? by option("--history", help = "the history containing the change")
+    private val show: String by option("--show", help = "the minimum status to include in the list")
         .choice("all", "aborted", "closed", "open").default("open")
-    private val format: String by option("--format", help = "The output format: either text or json")
+    private val usernameArg: String? by option("--user", help = "the userId of the user performing the command")
+    private val serverUrlArg: String? by option("--server", help = "the URL of the polytope server")
+    private val format: String by option("--format", help = "the output format")
         .choice("text", "json")
         .default("text")
 
@@ -104,13 +107,17 @@ class ChangeListCommand : PolytopeCommandBase("list", "list changes open in a hi
             val p = project ?: ws?.project
             val h = history ?: ws?.history
             if (p == null) {
-                throw PtException(PtException.Kind.UserError,
-                    "Either a project must be specified, or this command must be run in a workspace")
+                throw PtException(
+                    PtException.Kind.UserError,
+                    "Either a project must be specified, or this command must be run in a workspace"
+                )
 
             }
             if (h == null) {
-                throw PtException(PtException.Kind.UserError,
-                    "Either a history must be specified, or this command must be run in a workspace")
+                throw PtException(
+                    PtException.Kind.UserError,
+                    "Either a history must be specified, or this command must be run in a workspace"
+                )
             }
             val userId = usernameArg ?: requireUserId()
             val serverUrl = serverUrlArg ?: requireServerUrl()
@@ -135,27 +142,31 @@ class ChangeListCommand : PolytopeCommandBase("list", "list changes open in a hi
 
 }
 
-class ChangeGetCommand : PolytopeCommandBase("get", "retrieve a specific change record") {
-    private val usernameArg: String? by option("--user", help = "The userId of the user performing the command")
-    private val serverUrlArg: String? by option("--server", help = "The URL of the polytope server")
-    private val project: String? by option("--project", help = "The project containing the history")
-    private val history: String? by option("--history", help = "The history containing the change")
-    private val change: String by option("--change", help = "The name of the change").required()
-    private val format: String by option("--format", help="The output format")
+class ChangeGetCommand : PolytopeCommandBase("get", "Retrieve and view a specific change from the depot.") {
+    private val project: String? by option("-p", "--project", help = "the project containing the history")
+    private val history: String? by option("-h", "--history", help = "the history containing the change")
+    private val change: String by option("-c", "--change", help = "the name of the change").required()
+    private val format: String by option("-f", "--format", help = "the output format")
         .choice("text", "json")
         .default("text")
+    private val usernameArg: String? by option("-u", "--user", help = "the userId of the user performing the command")
+    private val serverUrlArg: String? by option("-s", "--server", help = "the URL of the polytope server")
 
     override fun run() {
         handleCommandErrors("change", "get") {
             val ws = loadWorkspace()
             val pr = project
                 ?: ws?.project
-                ?: throw PtException(PtException.Kind.UserError,
-                    "Either a project must be supplied, or this command must be run inside the workspace.")
+                ?: throw PtException(
+                    PtException.Kind.UserError,
+                    "Either a project must be supplied, or this command must be run inside the workspace."
+                )
             val hi = history
                 ?: ws?.history
-                ?:throw PtException(PtException.Kind.UserError,
-                    "Either a history must be supplied, or this command must be run inside the workspace.")
+                ?: throw PtException(
+                    PtException.Kind.UserError,
+                    "Either a history must be supplied, or this command must be run inside the workspace."
+                )
             val apiClient = if (ws == null) {
                 val user = usernameArg ?: requireUserId()
                 val password = getOrPromptForPassword()
@@ -177,13 +188,13 @@ class ChangeGetCommand : PolytopeCommandBase("get", "retrieve a specific change 
     }
 }
 
-class ChangeSavesCommand : PolytopeCommandBase("saves", help = "list savepoints in a change") {
-    private val project: String? by option("--project", help = "The project containing the history")
-    private val history: String? by option("--history", help = "The history containing the change")
-    private val change: String? by option("--change", help = "The name of the change")
-    private val username: String? by option("--user", help = "The userId of the user performing the command")
-    private val serverUrl: String? by option("--server", help = "The URL of the polytope server")
-    private val format: String by option("--format", help="The output format")
+class ChangeSavesCommand : PolytopeCommandBase("saves", help = "List the savepoints in a change.") {
+    private val project: String? by option("-p", "--project", help = "the project containing the change")
+    private val history: String? by option("-h", "--history", help = "the history containing the change")
+    private val change: String? by option("-c", "--change", help = "the name of the change")
+    private val username: String? by option("-u", "--user", help = "the userid of the user performing the command")
+    private val serverUrl: String? by option("-s", "--server", help = "the URL of the polytope server")
+    private val format: String by option("-f", "--format", help = "the output format")
         .choice("text", "json")
         .default("text")
 
@@ -192,15 +203,21 @@ class ChangeSavesCommand : PolytopeCommandBase("saves", help = "list savepoints 
             val ws = loadWorkspace()
             val pr = project
                 ?: ws?.project
-                ?: throw PtException(PtException.Kind.UserError,
-                    "Either a project must be supplied, or this command must be run inside the workspace.")
+                ?: throw PtException(
+                    PtException.Kind.UserError,
+                    "Either a project must be supplied, or this command must be run inside the workspace."
+                )
             val hi = history
                 ?: ws?.history
-                ?: throw PtException(PtException.Kind.UserError,
-                    "Either a history must be supplied, or this command must be run inside the workspace.")
-            val ch = change ?: ws?.change ?: throw throw PtException(PtException.Kind.UserError,
+                ?: throw PtException(
+                    PtException.Kind.UserError,
+                    "Either a history must be supplied, or this command must be run inside the workspace."
+                )
+            val ch = change ?: ws?.change ?: throw throw PtException(
+                PtException.Kind.UserError,
                 ("Either a history must be supplied, or this command must be " +
-                        "run inside a workspace with an active change."))
+                        "run inside a workspace with an active change.")
+            )
             val apiClient = if (ws == null) {
                 val user = username ?: requireUserId()
                 val password = getOrPromptForPassword()
@@ -224,8 +241,13 @@ class ChangeSavesCommand : PolytopeCommandBase("saves", help = "list savepoints 
     }
 }
 
-class ChangeDeliverCommand : PolytopeCommandBase("deliver", help = "deliver a completed change to its history") {
-    private val description: String by option("--description", help="a description of the change being delivered").required()
+class ChangeDeliverCommand : PolytopeCommandBase("deliver", help = "Deliver a completed change to its history.") {
+    private val description: String by option(
+        "-d",
+        "--description",
+        help = "a description of the change being delivered"
+    ).required()
+
     override fun run() {
         handleCommandErrors("change", "deliver") {
             val ws = requireWorkspace()
@@ -243,8 +265,12 @@ class ChangeIntegrateCommand : PolytopeCommandBase(
     "integrate",
     help = "integrate a change from a different history into an in-progress change."
 ) {
-    private val history: String by option("--history", help = "the history containing the change to integrate").required()
-    private val change: String by option("--change", help = "the name of the change to integrate").required()
+    private val history: String by option(
+        "-h",
+        "--history",
+        help = "the history containing the change to integrate"
+    ).required()
+    private val change: String by option("-c", "--change", help = "the name of the change to integrate").required()
     override fun run() {
         handleCommandErrors("change", "integrate") {
             val ws = requireWorkspace()
@@ -253,7 +279,7 @@ class ChangeIntegrateCommand : PolytopeCommandBase(
                 ws.populate(updated)
                 updated
             }
-            if (updated.conflicts.isNotEmpty()){
+            if (updated.conflicts.isNotEmpty()) {
                 echo("Integrating change produced conflicts:")
                 for (c in updated.conflicts) {
                     echo(c.render())
@@ -268,8 +294,17 @@ class ChangeIntegrateDiffCommand : PolytopeCommandBase(
     "integrate-diff",
     help = "integrate a diff from a different history into an in-progress change."
 ) {
-    private val fromVersion: String by option("--from", help="The project version specifier of the beginning of the diff").required()
-    private val toVersion: String by option("--to", help="The project version specifier of the end of the diff").required()
+    private val fromVersion: String by option(
+        "-f",
+        "--from",
+        help = "The project version specifier of the beginning of the diff"
+    ).required()
+    private val toVersion: String by option(
+        "-t",
+        "--to",
+        help = "The project version specifier of the end of the diff"
+    ).required()
+
     override fun run() {
         handleCommandErrors("change", "integrate-diff") {
             val ws = requireWorkspace()
@@ -280,7 +315,7 @@ class ChangeIntegrateDiffCommand : PolytopeCommandBase(
                 ws.populate(updated)
                 updated
             }
-            if (updated.conflicts.isNotEmpty()){
+            if (updated.conflicts.isNotEmpty()) {
                 echo("Integrating diff produced conflicts:")
                 for (c in updated.conflicts) {
                     echo(c.render())
@@ -294,14 +329,14 @@ class ChangeIntegrateDiffCommand : PolytopeCommandBase(
 
 class ChangeAbortCommand : PolytopeCommandBase(
     name = "abort",
-    help = "abort an in-progress change."
+    help = "Abort an in-progress change."
 ) {
-    private val project: String by option("--project", help = "The project containing the history").required()
-    private val history: String by option("--history", help = "The history containing the change").required()
-    private val change: String by option("--change", help = "The name of the change").required()
-    private val reason: String by option("--reason", help = "The reason for abandoning the change").required()
-    private val username: String? by option("--user", help = "The userId of the user performing the command")
-    private val serverUrlOpt: String? by option("--server", help = "The URL of the polytope server")
+    private val project: String by option("-p", "--project", help = "the project containing the history").required()
+    private val history: String by option("-h", "--history", help = "the history containing the change").required()
+    private val change: String by option("-c", "--change", help = "the name of the change").required()
+    private val reason: String by option("-d", "--reason", help = "the reason for abandoning the change").required()
+    private val username: String? by option("-u", "--user", help = "the userId of the user performing the command")
+    private val serverUrlOpt: String? by option("-s", "--server", help = "the URL of the polytope server")
 
     override fun run() {
         handleCommandErrors("change", "abandon") {

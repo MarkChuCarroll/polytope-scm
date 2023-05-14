@@ -33,7 +33,7 @@ data class FileState(
  * - it allows us to detect which files in the workspace have changed.
  */
 data class StateMap(
-        private val fileStates: MutableMap<String, FileState>
+    private val fileStates: MutableMap<String, FileState>
 ) {
     val paths: Set<String>
         get() = fileStates.keys
@@ -126,8 +126,10 @@ class ClientWorkspace(cfg: ClientConfig, val name: String) {
 
     private fun requireChange(wsState: Workspace) {
         if (wsState.change == null) {
-            throw PtException(PtException.Kind.UserError,
-                "Modifications can't be made in the workspace without an open change")
+            throw PtException(
+                PtException.Kind.UserError,
+                "Modifications can't be made in the workspace without an open change"
+            )
         }
     }
 
@@ -171,14 +173,18 @@ class ClientWorkspace(cfg: ClientConfig, val name: String) {
 
     suspend fun deleteFile(path: String, really: Boolean): List<String> {
         val stateMap = getStateMap()
-        if (path !in stateMap.paths && !Path(path).exists())   {
-            throw PtException(PtException.Kind.NotFound,
-                    "File $path not found in workspace")
+        if (path !in stateMap.paths && !Path(path).exists()) {
+            throw PtException(
+                PtException.Kind.NotFound,
+                "File $path not found in workspace"
+            )
         }
         val wsState = getState()
         requireChange(wsState)
-        val deleted = apiClient.workspaceDeleteFile(wsState.project, wsState.name,
-                path)
+        val deleted = apiClient.workspaceDeleteFile(
+            wsState.project, wsState.name,
+            path
+        )
         if (really) {
             File(path).deleteRecursively()
         }
@@ -194,7 +200,8 @@ class ClientWorkspace(cfg: ClientConfig, val name: String) {
         val wsState = getState()
         requireChange(wsState)
         val updated = apiClient.workspaceMoveFile(
-                wsState.project, wsState.name, fromPath, toPath)
+            wsState.project, wsState.name, fromPath, toPath
+        )
         populate(updated)
     }
 
@@ -207,8 +214,10 @@ class ClientWorkspace(cfg: ClientConfig, val name: String) {
     suspend fun openChange(history: String, changeName: String) {
         val wsState = getState()
         if (wsState.modifiedArtifacts.isNotEmpty()) {
-            throw PtException(PtException.Kind.Constraint,
-                    "Can't open a new change: The workspace contains unsaved changes")
+            throw PtException(
+                PtException.Kind.Constraint,
+                "Can't open a new change: The workspace contains unsaved changes"
+            )
         }
         val updatedWs = apiClient.workspaceOpenChange(wsState.project, wsState.name, history, changeName)
         populate(updatedWs)
@@ -225,9 +234,12 @@ class ClientWorkspace(cfg: ClientConfig, val name: String) {
         val wsState = getState()
         val changes = findChanges()
         if (wsState.workingVersions.isNotEmpty() || wsState.modifiedArtifacts.isNotEmpty() ||
-            changes.deletedFiles.isNotEmpty() || changes.modifiedFiles.isNotEmpty()) {
-            throw PtException(PtException.Kind.UserError,
-                "Workspace contains unsaved changes")
+            changes.deletedFiles.isNotEmpty() || changes.modifiedFiles.isNotEmpty()
+        ) {
+            throw PtException(
+                PtException.Kind.UserError,
+                "Workspace contains unsaved changes"
+            )
         }
 
     }
@@ -272,7 +284,6 @@ class ClientWorkspace(cfg: ClientConfig, val name: String) {
     }
 
 
-
     /**
      * A utility function, which will compute a cryptographic hash string
      * for an input. This is used for comparing file contents to detect
@@ -294,8 +305,10 @@ class ClientWorkspace(cfg: ClientConfig, val name: String) {
     }
 
     private fun getStateMap(): StateMap {
-        return stateDb.getTyped(stateMapKey) ?: throw PtException(PtException.Kind.Internal,
-                "database error in polytope client; could not read state map")
+        return stateDb.getTyped(stateMapKey) ?: throw PtException(
+            PtException.Kind.Internal,
+            "database error in polytope client; could not read state map"
+        )
     }
 
     private fun getState(): Workspace {
@@ -316,11 +329,14 @@ class ClientWorkspace(cfg: ClientConfig, val name: String) {
 
 
     private var wsState: Workspace? = null
-    val apiClient = RestApiClient(cfg.serverUrl, cfg.userId, cfg.password ?: throw PtException(PtException.Kind.UserError,
-        "Workspace config must contain a password"))
+    val apiClient = RestApiClient(
+        cfg.serverUrl, cfg.userId, cfg.password ?: throw PtException(
+            PtException.Kind.UserError,
+            "Workspace config must contain a password"
+        )
+    )
     private val stateDbPath = cfg.wsPath / ".polytope" / "wsDb"
     private val stateDb: RocksDB = openRocksDB(stateDbPath.toString())
-
 
 
     companion object {

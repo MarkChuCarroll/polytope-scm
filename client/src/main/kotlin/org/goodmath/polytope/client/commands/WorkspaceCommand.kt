@@ -27,7 +27,7 @@ import org.goodmath.polytope.common.PtException
 import kotlin.io.path.Path
 import kotlin.io.path.div
 
-class WorkspaceCommand: PolytopeCommandBase("ws", help="Work with workspaces") {
+class WorkspaceCommand : PolytopeCommandBase("ws", help = "Manipulate polytope workspaces.") {
     override fun run() {
 
     }
@@ -49,11 +49,11 @@ class WorkspaceCommand: PolytopeCommandBase("ws", help="Work with workspaces") {
 
 }
 
-class WorkspaceListCommand: PolytopeCommandBase("list", help="List workspaces in a project") {
-    private val projectArg: String? by option("--project", help="The project containing the workspace")
-    private val usernameArg: String? by option("--user", help = "The userId of the user performing the command")
-    private val serverUrlArg: String? by option("--server", help = "The URL of the polytope server")
-    private val format: String by option("--format", help = "The output format")
+class WorkspaceListCommand : PolytopeCommandBase("list", help = "List workspaces in a project.") {
+    private val projectArg: String? by option("-p", "--project", help = "the project containing the workspace")
+    private val usernameArg: String? by option("-u", "--user", help = "the userId of the user performing the command")
+    private val serverUrlArg: String? by option("-s", "--server", help = "the URL of the polytope server")
+    private val format: String by option("-f", "--format", help = "the output format")
         .choice("text", "json")
         .default("text")
 
@@ -62,8 +62,10 @@ class WorkspaceListCommand: PolytopeCommandBase("list", help="List workspaces in
             val ws = loadWorkspace()
             val userId = usernameArg ?: requireUserId()
             val serverUrl = serverUrlArg ?: requireServerUrl()
-            val project = projectArg ?: ws?.project ?: throw PtException(PtException.Kind.UserError,
-                "You must either supply a project name, or run this command in a workspace")
+            val project = projectArg ?: ws?.project ?: throw PtException(
+                PtException.Kind.UserError,
+                "You must either supply a project name, or run this command in a workspace"
+            )
             val apiClient = ws?.apiClient ?: RestApiClient(serverUrl, userId, getOrPromptForPassword())
             val workspaces = runBlocking {
                 apiClient.workspacesList(project)
@@ -80,23 +82,27 @@ class WorkspaceListCommand: PolytopeCommandBase("list", help="List workspaces in
     }
 }
 
-class WorkspaceGetCommand: PolytopeCommandBase("get", help="Retrieve information about a specific workspace") {
-    private val projectArg: String? by option("--project", help="The project containing the workspace")
-    private val workspaceName: String? by option("--ws", help="The name of the workspace")
-    private val usernameArg: String? by option("--user", help = "The userId of the user performing the command")
-    private val serverUrlArg: String? by option("--server", help = "The URL of the polytope server")
-    private val format: String by option("--format", help = "The output format")
+class WorkspaceGetCommand : PolytopeCommandBase("get", help = "Retrieve and view information about a workspace.") {
+    private val projectArg: String? by option("-p", "--project", help = "the project containing the workspace")
+    private val workspaceName: String? by option("-w", "--ws", help = "the name of the workspace")
+    private val usernameArg: String? by option("-u", "--user", help = "the userId of the user performing the command")
+    private val serverUrlArg: String? by option("-s", "--server", help = "the URL of the polytope server")
+    private val format: String by option("-f", "--format", help = "the output format")
         .choice("text", "json")
         .default("text")
 
     override fun run() {
         val ws = loadWorkspace()
-        val userId = usernameArg ?:requireUserId()
+        val userId = usernameArg ?: requireUserId()
         val serverUrl = serverUrlArg ?: requireServerUrl()
-        val project = projectArg ?: ws?.project ?: throw PtException(PtException.Kind.UserError,
-            "You must either supply a project name, or run this command in a workspace")
-        val wsName = workspaceName ?: ws?.name ?: throw PtException(PtException.Kind.UserError,
-            "You must either supply a workspace name, or run this command in a workspace")
+        val project = projectArg ?: ws?.project ?: throw PtException(
+            PtException.Kind.UserError,
+            "You must either supply a project name, or run this command in a workspace"
+        )
+        val wsName = workspaceName ?: ws?.name ?: throw PtException(
+            PtException.Kind.UserError,
+            "You must either supply a workspace name, or run this command in a workspace"
+        )
         val apiClient = ws?.apiClient ?: RestApiClient(serverUrl, userId, getOrPromptForPassword())
         val workspace = runBlocking {
             apiClient.workspaceGet(project, wsName)
@@ -109,21 +115,31 @@ class WorkspaceGetCommand: PolytopeCommandBase("get", help="Retrieve information
     }
 }
 
-class WorkspaceCreateCommand: PolytopeCommandBase("create", help="Create a new workspace") {
-    private val projectOpt: String by option("-p", "--project", help="The project containing the workspace").required()
-    private val workspaceName: String by option("--ws", help="The name of the workspace").required()
-    private val description: String by option("-d", "--description", help="A description of the new workspace").required()
-    private val location: String? by option("-l", "--location", help="The location of the new workspace")
+class WorkspaceCreateCommand : PolytopeCommandBase("create", help = "Create a new workspace for a project.") {
+    private val projectOpt: String by option(
+        "-p",
+        "--project",
+        help = "The project containing the workspace"
+    ).required()
+    private val workspaceName: String by option("--ws", help = "The name of the workspace").required()
+    private val description: String by option(
+        "-d",
+        "--description",
+        help = "A description of the new workspace"
+    ).required()
+    private val location: String? by option("-l", "--location", help = "The location of the new workspace")
     private val usernameArg: String? by option("-u", "--user", help = "The userId of the user performing the command")
-    private val serverUrlArg: String? by option("-s","--server", help = "The URL of the polytope server")
+    private val serverUrlArg: String? by option("-s", "--server", help = "The URL of the polytope server")
     override fun run() {
         val cfg = requireClientConfig()
         val userId = usernameArg ?: requireUserId()
         val serverUrl = serverUrlArg ?: requireServerUrl()
         val apiClient = RestApiClient(serverUrl, userId, getOrPromptForPassword())
         val wsDir = location?.let { Path(it) } ?: (Path(".") / workspaceName)
-        val clientConfig = cfg.copy(userId = userId, serverUrl = serverUrl, wsName = workspaceName,
-            wsPath = wsDir)
+        val clientConfig = cfg.copy(
+            userId = userId, serverUrl = serverUrl, wsName = workspaceName,
+            wsPath = wsDir
+        )
 
         runBlocking {
             val ws = apiClient.workspaceCreate(projectOpt, "main", workspaceName, description)
@@ -133,20 +149,26 @@ class WorkspaceCreateCommand: PolytopeCommandBase("create", help="Create a new w
     }
 }
 
-class WorkspaceOpenCommand: PolytopeCommandBase("open", help="Open an existing workspace in this client") {
-    private val projectOpt: String by option("-p", "--project", help="The project containing the workspace").required()
-    private val workspaceName: String by option("--ws", help="The name of the workspace").required()
-    private val location: String? by option("-l", "--location", help="The location of the new workspace")
-    private val usernameArg: String? by option("-u", "--user", help = "The userId of the user performing the command")
-    private val serverUrlArg: String? by option("-s","--server", help = "The URL of the polytope server")
+class WorkspaceOpenCommand : PolytopeCommandBase("open", help = "Open an existing workspace in this client.") {
+    private val projectOpt: String by option(
+        "-p",
+        "--project",
+        help = "the project containing the workspace"
+    ).required()
+    private val workspaceName: String by option("--ws", help = "the name of the workspace").required()
+    private val location: String? by option("-l", "--location", help = "the location of the new workspace")
+    private val usernameArg: String? by option("-u", "--user", help = "the userId of the user performing the command")
+    private val serverUrlArg: String? by option("-s", "--server", help = "the URL of the polytope server")
     override fun run() {
         val cfg = requireClientConfig()
         val userId = usernameArg ?: requireUserId()
         val serverUrl = serverUrlArg ?: requireServerUrl()
         val apiClient = RestApiClient(serverUrl, userId, getOrPromptForPassword())
         val wsDir = location?.let { Path(it) } ?: (Path(".") / workspaceName)
-        val clientConfig = cfg.copy(userId = userId, serverUrl = serverUrl, wsName = workspaceName,
-            wsPath = wsDir)
+        val clientConfig = cfg.copy(
+            userId = userId, serverUrl = serverUrl, wsName = workspaceName,
+            wsPath = wsDir
+        )
 
         runBlocking {
             val ws = apiClient.workspaceGet(projectOpt, workspaceName)
@@ -156,9 +178,18 @@ class WorkspaceOpenCommand: PolytopeCommandBase("open", help="Open an existing w
     }
 }
 
-class WorkspaceSaveCommand: PolytopeCommandBase("save", "save changes in this workspace to the server") {
-    private val description: String by option("--description").required()
-    private val resolved: List<String> by option("-r", "--resolve", help="the ID of a conflict which was resolved").multiple()
+class WorkspaceSaveCommand : PolytopeCommandBase("save", "Save changes in this workspace to the server.") {
+    private val description: String by option(
+        "-d",
+        "--description",
+        help = "a brief description of the changes being saved"
+    ).required()
+    private val resolved: List<String> by option(
+        "-r",
+        "--resolve",
+        help = "the ID of a conflict which was resolved"
+    ).multiple()
+
     override fun run() {
         handleCommandErrors("workspace", "save") {
             val ws = requireWorkspace()
@@ -170,7 +201,7 @@ class WorkspaceSaveCommand: PolytopeCommandBase("save", "save changes in this wo
     }
 }
 
-class WorkspaceUpdateCommand: PolytopeCommandBase("update", "update the workspace from its parent history") {
+class WorkspaceUpdateCommand : PolytopeCommandBase("update", "update the workspace from its parent history") {
     override fun run() {
         handleCommandErrors("workspace", "update") {
             val ws = requireWorkspace()
@@ -190,10 +221,16 @@ class WorkspaceUpdateCommand: PolytopeCommandBase("update", "update the workspac
     }
 }
 
-class WorkspaceResetCommand: PolytopeCommandBase(help="Reset the workspace to a prior savepoint, abandoning unsaved changes",
-    name="reset") {
-    private val reason: String by option("--reason", help="The reason the workspace changes are being abandoned").required()
-    private val stepIndex: Int? by option("--index", help="The step index within the change to reset to").int()
+class WorkspaceResetCommand : PolytopeCommandBase(
+    help = "Reset the workspace to a prior savepoint, abandoning unsaved changes.",
+    name = "reset"
+) {
+    private val reason: String by option(
+        "-r",
+        "--reason",
+        help = "the reason the workspace changes are being abandoned"
+    ).required()
+    private val stepIndex: Int? by option("-v", "--step", help = "the step index within the change to reset to").int()
 
     override fun run() {
         handleCommandErrors("workspace", "reset") {
@@ -207,18 +244,30 @@ class WorkspaceResetCommand: PolytopeCommandBase(help="Reset the workspace to a 
     }
 }
 
-class WorkspaceDeleteCommand: PolytopeCommandBase(help="Delete a workspace",
-    name="delete") {
-    private val project: String by option("--project", help="the name of the project containing the workspace").required()
-    private val ws: String by option("--ws", help="the name of the workspace to delete").required()
-    private val asUser: String? by option("--as", help="The userID of the user to act-as when performing this operation")
-    private val serverUrl: String? by option("--server", help="The URL of the polytope server")
+class WorkspaceDeleteCommand : PolytopeCommandBase(
+    help = "Delete a workspace.",
+    name = "delete"
+) {
+    private val project: String by option(
+        "-p",
+        "--project",
+        help = "the name of the project containing the workspace"
+    ).required()
+    private val ws: String by option("-w", "--ws", help = "the name of the workspace to delete").required()
+    private val asUser: String? by option(
+        "-a",
+        "--acting-user",
+        help = "the userID of the user performing this operation"
+    )
+    private val serverUrl: String? by option("-s", "--server", help = "the URL of the polytope server")
 
     override fun run() {
         handleCommandErrors("workspace", "delete") {
-            val apiClient = RestApiClient(serverUrl ?: requireServerUrl(),
+            val apiClient = RestApiClient(
+                serverUrl ?: requireServerUrl(),
                 asUser ?: requireUserId(),
-                getOrPromptForPassword())
+                getOrPromptForPassword()
+            )
             runBlocking {
                 apiClient.workspaceDelete(project, ws)
             }

@@ -39,7 +39,7 @@ import kotlin.system.exitProcess
 
 val klaxon = Klaxon()
 
-abstract class PolytopeCommandBase(name: String, help: String): CliktCommand(name=name, help=help) {
+abstract class PolytopeCommandBase(name: String, help: String) : CliktCommand(name = name, help = help) {
     private val logger = LoggerFactory.getLogger(PolytopeCommandBase::class.java)
     private val homedir = Path(System.getenv("HOME"))
     private var workspace: ClientWorkspace? = null
@@ -50,19 +50,25 @@ abstract class PolytopeCommandBase(name: String, help: String): CliktCommand(nam
      * workspace, this will throw an exception.
      */
     fun requireWorkspace(): ClientWorkspace {
-        return loadWorkspace() ?: throw PtException(PtException.Kind.UserError,
-            "Command must be run inside of a workspace")
+        return loadWorkspace() ?: throw PtException(
+            PtException.Kind.UserError,
+            "Command must be run inside of a workspace"
+        )
     }
 
     fun requireServerUrl(): String {
-        return getClientConfig()?.serverUrl ?: throw PtException(PtException.Kind.UserError,
-            "You must either supply a serverURL, or have a serverURL stored in your user or workspace config")
+        return getClientConfig()?.serverUrl ?: throw PtException(
+            PtException.Kind.UserError,
+            "You must either supply a serverURL, or have a serverURL stored in your user or workspace config"
+        )
 
     }
 
     fun requireUserId(): String {
-        return getClientConfig()?.userId ?: throw PtException(PtException.Kind.UserError,
-            "You must either supply a userid, or have your userid stored in your user or workspace config")
+        return getClientConfig()?.userId ?: throw PtException(
+            PtException.Kind.UserError,
+            "You must either supply a userid, or have your userid stored in your user or workspace config"
+        )
     }
 
     fun getOrPromptForPassword(): String {
@@ -78,8 +84,10 @@ abstract class PolytopeCommandBase(name: String, help: String): CliktCommand(nam
             ?: prompt(
                 text = "Enter password: ",
                 hideInput = true,
-            ) ?: throw PtException(PtException.Kind.Authentication,
-                 "Could not read user password")
+            ) ?: throw PtException(
+                PtException.Kind.Authentication,
+                "Could not read user password"
+            )
     }
 
 
@@ -91,8 +99,10 @@ abstract class PolytopeCommandBase(name: String, help: String): CliktCommand(nam
     }
 
     fun requireClientConfig(): ClientConfig {
-        return getClientConfig() ?: throw PtException(PtException.Kind.NotFound,
-            "configuration not found")
+        return getClientConfig() ?: throw PtException(
+            PtException.Kind.NotFound,
+            "configuration not found"
+        )
     }
 
     fun prettyJson(t: Any): String {
@@ -122,11 +132,12 @@ abstract class PolytopeCommandBase(name: String, help: String): CliktCommand(nam
     }
 
     private fun printErrorAndExit(noun: String, verb: String, e: Throwable) {
-        when(e) {
+        when (e) {
             is PtException -> {
                 echo(e.toString())
                 exitProcess(e.kind.toExitCode())
             }
+
             else -> {
                 echo("Unexpected internal error performing $noun $verb: $e", err = true)
                 e.printStackTrace()
@@ -136,15 +147,17 @@ abstract class PolytopeCommandBase(name: String, help: String): CliktCommand(nam
     }
 }
 
-class Polytope: PolytopeCommandBase("pt", help="The polytope command line client") {
-    private val logLevel: String by option("--logging", help="The logging level to display")
-        .choice("error", "warning", "info", "trace", "all", "none")
-        .default("none")
+class Polytope : PolytopeCommandBase("pt", help = "The Polytope SCM Command line") {
+    private val logLevel: String by option("--logging", help = "The logging level to display")
+        .choice("error", "warning", "info", "trace", "all", "off")
+        .default("off")
 
     private fun updateLoggingLevel(level: String) {
         val loggerContext = LoggerFactory.getILoggerFactory() as LoggerContext
         val logger: Logger = loggerContext.getLogger(PolytopeCommandBase::class.java)
         logger.level = Level.toLevel(level)
+
+
     }
 
     override fun run() {

@@ -1,4 +1,5 @@
 package org.goodmath.polytope.client.workspace
+
 import com.beust.klaxon.Klaxon
 import org.goodmath.polytope.common.PtException
 import java.nio.file.Path
@@ -56,7 +57,8 @@ data class ClientConfig(
                 serverUrl = wsConfig?.serverUrl ?: return null,
                 wsPath = Path(wsConfig?.wsPath ?: return null),
                 wsName = wsConfig.wsName,
-                password = password)
+                password = password
+            )
 
         }
 
@@ -84,12 +86,13 @@ data class UserConfig(
         fun load(): UserConfig {
             val cfgPath = Path("~/.config/polytope/config.json")
             if (cfgPath.exists()) {
-                return ClientConfig.klaxon.parse(cfgPath.toFile())?: UserConfig()
+                return ClientConfig.klaxon.parse(cfgPath.toFile()) ?: UserConfig()
             }
             return UserConfig()
         }
     }
 }
+
 data class WorkspaceConfig(
     val wsName: String,
     val serverUrl: String,
@@ -117,8 +120,10 @@ data class WorkspaceConfig(
                 ?: return null
             val cfgPath = wsPath / ".pt" / "config.json"
             return if (cfgPath.exists()) {
-                ClientConfig.klaxon.parse(cfgPath.toFile()) ?: throw PtException(PtException.Kind.UserError,
-                    "Invalid configuration file")
+                ClientConfig.klaxon.parse(cfgPath.toFile()) ?: throw PtException(
+                    PtException.Kind.UserError,
+                    "Invalid configuration file"
+                )
             } else {
                 null
             }
