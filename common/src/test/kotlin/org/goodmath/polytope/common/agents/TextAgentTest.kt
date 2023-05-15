@@ -19,10 +19,10 @@ class TextAgentTest {
         val ancestorVer = ArtifactVersion(
             id = "ancestorId",
             artifactId = "testdoc",
-            artifactType = TextAgent.artifactType,
+            artifactType = TextContentAgent.artifactType,
             timestamp = Instant.now().toEpochMilli(),
             creator = "me",
-            content = TextAgent.encodeToString(Text(ancestorContent)),
+            content = TextContentAgent.encodeToString(TextContent(ancestorContent)),
             parents = emptyList(),
             metadata = emptyMap(),
             status = VersionStatus.Committed
@@ -30,10 +30,10 @@ class TextAgentTest {
         val sourceVer = ArtifactVersion(
             id = "sourceId",
             artifactId = "testdoc",
-            artifactType = TextAgent.artifactType,
+            artifactType = TextContentAgent.artifactType,
             timestamp = Instant.now().toEpochMilli(),
             creator = "me",
-            content = TextAgent.encodeToString(Text(sourceContent)),
+            content = TextContentAgent.encodeToString(TextContent(sourceContent)),
             parents = listOf(ancestorVer.id),
             metadata = emptyMap(),
             status = VersionStatus.Committed
@@ -41,10 +41,10 @@ class TextAgentTest {
         val targetVer = ArtifactVersion(
             id = "targetId",
             artifactId = "testdoc",
-            artifactType = TextAgent.artifactType,
+            artifactType = TextContentAgent.artifactType,
             timestamp = Instant.now().toEpochMilli(),
             creator = "me",
-            content = TextAgent.encodeToString(Text(targetContent)),
+            content = TextContentAgent.encodeToString(TextContent(targetContent)),
             parents = listOf(ancestorVer.id),
             metadata = emptyMap(),
             status = VersionStatus.Committed
@@ -57,8 +57,8 @@ class TextAgentTest {
     @Test
     fun `it should be able to encode and decode content`() {
         val content = listOf("aaa\n", "bbb\n", "ccc\n", "ddd\n", "eeee\n")
-        val encoded = TextAgent.encodeToString(Text(content))
-        val decoded = TextAgent.decodeFromString(encoded)
+        val encoded = TextContentAgent.encodeToString(TextContent(content))
+        val decoded = TextContentAgent.decodeFromString(encoded)
         assertEquals(content, decoded.content)
     }
 
@@ -67,7 +67,7 @@ class TextAgentTest {
         val ancestorText = listOf("a\n", "b\n", "c\n", "d\n", "e\n")
         val sourceText = listOf("a\n", "c\n", "q\n", "d\n", "e\n")
 
-        val lab = TextAgent.createLabelledList(ancestorText, sourceText)
+        val lab = TextContentAgent.createLabelledList(ancestorText, sourceText)
         assertEquals(6, lab.size)
         assertEquals(
             LabeledLine(LineLabel.Unmodified, "a\n", 0, 0, 1),
@@ -102,9 +102,9 @@ class TextAgentTest {
         val sourceText = listOf("a\n", "c\n", "q\n", "d\n", "e\n")
         val targetText = listOf("a\n", "b\n", "c\n", "d\n", "e\n")
 
-        val labeledSrc = TextAgent.createLabelledList(ancestorText, sourceText)
-        val labeledTgt = TextAgent.createLabelledList(ancestorText, targetText)
-        val coalesced = TextAgent.coalesceLinesIntoBlocks(labeledSrc, labeledTgt)
+        val labeledSrc = TextContentAgent.createLabelledList(ancestorText, sourceText)
+        val labeledTgt = TextContentAgent.createLabelledList(ancestorText, targetText)
+        val coalesced = TextContentAgent.coalesceLinesIntoBlocks(labeledSrc, labeledTgt)
         assertContentEquals(
             listOf(
                 MergeBlock(
@@ -148,8 +148,8 @@ class TextAgentTest {
 
         val (anc, src, tgt) = buildTextVersions(ancestorText, sourceText, targetText)
 
-        val merge = TextAgent.merge(anc, src, tgt)
-        val proposed = TextAgent.decodeFromString(merge.proposedMerge)
+        val merge = TextContentAgent.merge(anc, src, tgt)
+        val proposed = TextContentAgent.decodeFromString(merge.proposedMerge)
         assertContentEquals(sourceText, proposed.content)
         assertEquals(0, merge.conflicts.size)
     }

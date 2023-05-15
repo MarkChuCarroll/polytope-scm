@@ -19,8 +19,8 @@ package org.goodmath.polytope.workspace
 import org.goodmath.polytope.TestStub
 import org.goodmath.polytope.common.agents.Directory
 import org.goodmath.polytope.common.agents.DirectoryAgent
-import org.goodmath.polytope.common.agents.text.Text
-import org.goodmath.polytope.common.agents.text.TextAgent
+import org.goodmath.polytope.common.agents.text.TextContent
+import org.goodmath.polytope.common.agents.text.TextContentAgent
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.assertContains
@@ -49,7 +49,7 @@ class WorkspaceBasicsTest: TestStub() {
             "a test workspace"
         )
         val ch = depot.workspaces.createChange(user, ws, "main", "test-change", "just a test")
-        val newFileId = depot.workspaces.addFile(user, ws, "foo", TextAgent.artifactType, TextAgent.encodeToString(Text(listOf("11\n", "22\n", "33\n"))))
+        val newFileId = depot.workspaces.addFile(user, ws, "foo", TextContentAgent.artifactType, TextContentAgent.encodeToString(TextContent(listOf("11\n", "22\n", "33\n"))))
         val sp = depot.workspaces.save(user, ws,"test", emptyList())
 
         val paths = depot.workspaces.listPaths(user, ws)
@@ -77,11 +77,11 @@ class WorkspaceBasicsTest: TestStub() {
         ))
         val dirRid = depot.workspaces.addFile(user, ws,"rid", DirectoryAgent.artifactType, DirectoryAgent.encodeToString(Directory()))
         depot.workspaces.addFile(user, ws,"dir/boo", DirectoryAgent.artifactType, DirectoryAgent.encodeToString(Directory()))
-        depot.workspaces.addFile(user, ws,"dir/boo/text.txt", TextAgent.artifactType, TextAgent.encodeToString(Text(listOf("just some text\t",
+        depot.workspaces.addFile(user, ws,"dir/boo/text.txt", TextContentAgent.artifactType, TextContentAgent.encodeToString(TextContent(listOf("just some text\t",
             "boring\n",
             "not interesting\n"))))
-        val dull = depot.workspaces.addFile(user, ws,"rid/blah.txt", TextAgent.artifactType, TextAgent.encodeToString(
-            Text(listOf(
+        val dull = depot.workspaces.addFile(user, ws,"rid/blah.txt", TextContentAgent.artifactType, TextContentAgent.encodeToString(
+            TextContent(listOf(
                 "I didn't realize\n",
                 "but that last one\n",
                 "was more interesting than this one\n"))))

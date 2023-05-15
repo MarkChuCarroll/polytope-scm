@@ -6,7 +6,10 @@ import maryk.rocksdb.RocksDB
 import maryk.rocksdb.openRocksDB
 import org.goodmath.polytope.common.PtException
 import org.goodmath.polytope.common.WorkspaceFileContents
-import org.goodmath.polytope.common.agents.text.TextAgent
+import org.goodmath.polytope.common.agents.BinaryContentAgent
+import org.goodmath.polytope.common.agents.FileAgent
+import org.goodmath.polytope.common.agents.text.TextContentAgent
+import org.goodmath.polytope.common.util.FileType
 import java.io.*
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -20,6 +23,7 @@ private const val stateMapKey = "file_states"
 data class FileState(
     val path: String,
     val hash: String,
+    val type: String
 )
 
 /**
@@ -69,8 +73,9 @@ data class FileChanges(
     val deletedFiles: List<String>
 )
 
-class ClientWorkspace(cfg: ClientConfig, val name: String) {
-
+class ClientWorkspace(val cfg: ClientConfig, val name: String) {
+    private val fileAgents = mapOf(TextContentAgent.artifactType to TextContentAgent,
+        BinaryContentAgent.artifactType to BinaryContentAgent)
 
     /**
      * List the paths of all tracked files in the workspace
@@ -91,9 +96,9 @@ class ClientWorkspace(cfg: ClientConfig, val name: String) {
         val paths = apiClient.workspaceListPaths(newState.project, newState.name).paths
         val newStateMap = StateMap(mutableMapOf())
         for (p in paths) {
-            // For a first pass, we'll only deal with text files.
             val file = apiClient.workspaceGetFile(newState.project, newState.name, p)
-            if (file.artifactType == TextAgent.artifactType) {
+            val agent = fileAgents[file.artifactType]
+            if (agent != null) {
                 val fileHash = computeHash(StringReader(file.content))
                 if (file.path !in stateMap.paths) {
                     System.err.println("Adding new retrieved file ${file.path}")
@@ -101,20 +106,16 @@ class ClientWorkspace(cfg: ClientConfig, val name: String) {
                     if (!path.parent.exists()) {
                         path.parent.toFile().mkdirs()
                     }
-                    val out = FileWriter(path.toFile())
-                    out.write(file.content)
-                    out.close()
+                    agent.stringToDisk(path, file.content)
                 } else {
                     if (fileHash != stateMap[file.path]?.hash) {
                         System.err.println("Updating existing file ${file.path}")
-                        val out = FileWriter(file.path)
-                        out.write(file.content)
-                        out.close()
+                        agent.stringToDisk(Path(file.path), file.content)
                     } else {
                         System.err.println("File ${file.path} did not need to be updated")
                     }
                 }
-                newStateMap[file.path] = FileState(file.path, fileHash)
+                newStateMap[file.path] = FileState(file.path, fileHash, file.artifactType)
             }
         }
         val deadPaths = stateMap.paths - paths.toSet()
@@ -161,12 +162,19 @@ class ClientWorkspace(cfg: ClientConfig, val name: String) {
         }
         var updated: Workspace = wsState
         for (p in pathsToAdd) {
-            val content = WorkspaceFileContents(p, TextAgent.artifactType, File(p).readText())
+            val fileType = FileType.of(File(p))
+            val agent: FileAgent<out Any> = if (fileType == FileType.binary) {
+                BinaryContentAgent
+            } else {
+                TextContentAgent
+            }
+            val (contentObject, hash) = agent.readStringWithHash(Path(p))
+            val content = WorkspaceFileContents(p, agent.artifactType, contentObject)
             updated = apiClient.workspaceAddFile(
                 wsState.project, wsState.name, p,
                 content
             )
-            stateMap[p] = FileState(p, computeHash(StringReader(content.content)))
+            stateMap[p] = FileState(p, hash, agent.artifactType)
         }
         saveState(updated, stateMap)
     }
@@ -251,7 +259,7 @@ class ClientWorkspace(cfg: ClientConfig, val name: String) {
             apiClient.workspaceDeleteFile(wsState.project, wsState.name, d)
         }
         for (m in changes.modifiedFiles) {
-            val f = WorkspaceFileContents(m, TextAgent.artifactType, File(m).readText())
+            val f = WorkspaceFileContents(m, TextContentAgent.artifactType, File(m).readText())
             apiClient.workspaceModifyFile(wsState.project, wsState.name, m, f.content)
         }
         val updated = apiClient.workspaceSave(wsState.project, wsState.name, desc, resolved)

@@ -1,11 +1,11 @@
 package org.goodmath.polytope.client.workspace
 
+import com.beust.klaxon.JsonObject
 import com.beust.klaxon.Klaxon
+import org.goodmath.polytope.client.commands.klaxon
 import org.goodmath.polytope.common.PtException
 import java.nio.file.Path
-import kotlin.io.path.Path
-import kotlin.io.path.div
-import kotlin.io.path.exists
+import kotlin.io.path.*
 
 
 /*
@@ -102,6 +102,14 @@ data class WorkspaceConfig(
     val email: String? = null,
     val ignorePatterns: List<String> = emptyList()
 ) {
+    private fun prettyJson(t: Any): String {
+        return klaxon.parse<JsonObject>(klaxon.toJsonString(t))!!.toJsonString(true)
+    }
+
+    fun save(path: Path = Path(".")) {
+        path.writeText(prettyJson(this))
+    }
+
     companion object {
         private fun findWorkspace(p: Path): Path? {
             return if ((p / ".pt" / "config.json").exists()) {
@@ -114,6 +122,7 @@ data class WorkspaceConfig(
                 }
             }
         }
+
 
         fun load(path: Path = Path(".")): WorkspaceConfig? {
             val wsPath = findWorkspace(path)

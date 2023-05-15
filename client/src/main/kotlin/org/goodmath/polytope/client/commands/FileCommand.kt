@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.choice
 import kotlinx.coroutines.runBlocking
+import org.goodmath.polytope.client.workspace.WorkspaceConfig
 import org.goodmath.polytope.common.PtException
 import java.io.File
 
@@ -20,15 +21,16 @@ class FileCommand : PolytopeCommandBase("file", help = "Manipulate files in a po
     companion object {
         fun getCommand(): CliktCommand =
             FileCommand().subcommands(
-                ListFiles(),
-                AddFileCommand(),
-                MoveFileCommand(),
-                DeleteFileCommand()
+                FileListCommand(),
+                FileAddCommand(),
+                FileMoveCommand(),
+                FileDeleteCommand(),
+                FileIgnoreCommand()
             )
     }
 }
 
-class AddFileCommand : PolytopeCommandBase("add", help = "Add a new tracked file to the workspace.") {
+class FileAddCommand : PolytopeCommandBase("add", help = "Add a new tracked file to the workspace.") {
     private val recursive: Boolean by option(
         "-r",
         "--recursive",
@@ -46,7 +48,7 @@ class AddFileCommand : PolytopeCommandBase("add", help = "Add a new tracked file
     }
 }
 
-class MoveFileCommand : PolytopeCommandBase("mv", "Move a tracked file inside of a workspace.") {
+class FileMoveCommand : PolytopeCommandBase("mv", "Move a tracked file inside of a workspace.") {
     private val fromPath: String by argument(help = "the file to move")
     private val toPath: String by argument(help = "the place to move it to")
     override fun run() {
@@ -61,7 +63,7 @@ class MoveFileCommand : PolytopeCommandBase("mv", "Move a tracked file inside of
     }
 }
 
-class DeleteFileCommand : PolytopeCommandBase("rm", "Delete files in the workspace.") {
+class FileDeleteCommand : PolytopeCommandBase("rm", "Delete files in the workspace.") {
     private val recursive: Boolean by option("-r", "--recursive").flag(default = false)
     private val untrack: Boolean by option(
         "-x", "--untrack-only",
@@ -93,7 +95,7 @@ class DeleteFileCommand : PolytopeCommandBase("rm", "Delete files in the workspa
     }
 }
 
-class ListFiles : PolytopeCommandBase("list", help = "List the tracked, versioned artifacts in the workspace") {
+class FileListCommand : PolytopeCommandBase("list", help = "List the tracked, versioned artifacts in the workspace") {
     private val format: String by option("-f", "--format", help = "the output format")
         .choice("text", "json")
         .default("text")
@@ -113,4 +115,20 @@ class ListFiles : PolytopeCommandBase("list", help = "List the tracked, versione
             }
         }
     }
+}
+
+class FileIgnoreCommand: PolytopeCommandBase("ignore", help="Tell the polytope client to ignore files in the workspace") {
+    val pattern by argument("pattern", help="a glob expression describing files to be ignored")
+    override fun run() {
+        handleCommandErrors("file", "ignore") {
+            val ws = requireWorkspace()
+            val wsCfg = WorkspaceConfig.load(ws.cfg.wsPath)
+                ?: throw PtException(PtException.Kind.Internal,
+                    "Workspace configuration is invalid")
+            val updated = wsCfg.copy(ignorePatterns =  wsCfg.ignorePatterns + pattern)
+            updated.save(ws.cfg.wsPath)
+        }
+    }
+
+
 }

@@ -19,6 +19,9 @@ import org.goodmath.polytope.common.stashable.Artifact
 import org.goodmath.polytope.common.stashable.ArtifactVersion
 import org.goodmath.polytope.common.stashable.Id
 import java.lang.StringBuilder
+import java.nio.file.Path
+import java.security.MessageDigest
+import java.util.*
 
 data class MergeConflict(
     val id: Id<MergeConflict>,
@@ -57,6 +60,14 @@ interface Agent<T> {
     fun encodeToString(content: T): String
     fun decodeFromString(content: String): T
 
+    fun contentHash(content: T): String {
+        val str = encodeToString(content)
+        val base64encoder = Base64.getEncoder()
+        val digest = MessageDigest.getInstance("SHA-512")
+        digest.update(str.toByteArray())
+        return base64encoder.encodeToString(digest.digest())
+    }
+
     fun merge(
         ancestor: ArtifactVersion,
         source: ArtifactVersion,
@@ -65,5 +76,19 @@ interface Agent<T> {
 
 }
 
+interface FileAgent<T>: Agent<T> {
+    fun readFromDisk(path: Path): T
+    fun writeToDisk(path: Path, value: T)
 
+    fun stringFromDisk(path: Path): String
+
+    fun readStringWithHash(path: Path): Pair<String, String> {
+        val content = readFromDisk(path)
+        val hash = contentHash(content)
+        return Pair(encodeToString(content), hash)
+    }
+
+    fun stringToDisk(path: Path, content: String)
+
+}
 

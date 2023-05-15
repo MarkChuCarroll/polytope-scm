@@ -19,8 +19,8 @@ package org.goodmath.polytope.depot.stashes
 import org.goodmath.polytope.TestStub
 import org.goodmath.polytope.common.agents.BaselineAgent
 import org.goodmath.polytope.common.agents.DirectoryAgent
-import org.goodmath.polytope.common.agents.text.Text
-import org.goodmath.polytope.common.agents.text.TextAgent
+import org.goodmath.polytope.common.agents.text.TextContent
+import org.goodmath.polytope.common.agents.text.TextContentAgent
 import org.goodmath.polytope.common.stashable.ArtifactVersion
 import org.goodmath.polytope.common.stashable.AuthenticatedUser
 import org.goodmath.polytope.common.stashable.ChangeStatus
@@ -38,7 +38,7 @@ class DepotTest: TestStub() {
         testProject: String,
         depot: Depot
     ): ArtifactVersion {
-        val textContent = Text(
+        val textContent = TextContent(
             listOf(
                 "hello\n",
                 "there\n",
@@ -49,8 +49,8 @@ class DepotTest: TestStub() {
         val (_, tVer) = depot.artifacts.createArtifact(
             auth,
             testProject,
-            TextAgent.artifactType,
-            TextAgent.encodeToString(textContent),
+            TextContentAgent.artifactType,
+            TextContentAgent.encodeToString(textContent),
             emptyMap()
         )
 
@@ -131,12 +131,12 @@ class DepotTest: TestStub() {
             baseline.get(baseline.rootDir)!!
         )
         val dir = DirectoryAgent.decodeFromString(rootDirVer.content)
-        val someText = Text(listOf("aaa\n", "bbb\n", "ccc\n", "ddd\n"))
+        val someText = TextContent(listOf("aaa\n", "bbb\n", "ccc\n", "ddd\n"))
         val (textArt, textVer) = depot.artifacts.createArtifact(
             auth,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             pr.name,
-            TextAgent.encodeToString(someText),
+            TextContentAgent.encodeToString(someText),
             mapOf("order" to "lexical")
         )
         val newDir = dir.copy()
@@ -231,12 +231,12 @@ class DepotTest: TestStub() {
             description = "a test"
         )
 
-        val someText = Text(listOf("aaa\n", "bbb\n", "ccc\n", "ddd\n"))
+        val someText = TextContent(listOf("aaa\n", "bbb\n", "ccc\n", "ddd\n"))
         val (textArt, textVer) = depot.artifacts.createArtifact(
             auth,
             pr.name,
-            TextAgent.artifactType,
-            TextAgent.encodeToString(someText),
+            TextContentAgent.artifactType,
+            TextContentAgent.encodeToString(someText),
             mapOf("language" to "english")
         )
 
@@ -363,13 +363,13 @@ class DepotTest: TestStub() {
             "a test",
         )
 
-        val someText = Text(listOf("aaa\n", "bbb\n", "ccc\n", "ddd\n"))
+        val someText = TextContent(listOf("aaa\n", "bbb\n", "ccc\n", "ddd\n"))
         val (textArt, textVer) = depot.artifacts.createArtifact(
             auth = auth,
-            artifactType = TextAgent.artifactType,
+            artifactType = TextContentAgent.artifactType,
             project = pr.name,
             metadata = mapOf("language" to "english", "order" to "lexical"),
-            initialContent = TextAgent.encodeToString(someText),
+            initialContent = TextContentAgent.encodeToString(someText),
         )
         val newDir = dir.copy()
         newDir.addBinding("txt.txt", textVer.artifactId)

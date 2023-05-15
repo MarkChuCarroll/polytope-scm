@@ -16,7 +16,7 @@
 
 package org.goodmath.polytope.common.agents.text
 
-import org.goodmath.polytope.common.agents.Agent
+import org.goodmath.polytope.common.agents.FileAgent
 import org.goodmath.polytope.common.agents.MergeConflict
 import org.goodmath.polytope.common.agents.MergeResult
 import org.goodmath.polytope.common.stashable.Artifact
@@ -24,9 +24,13 @@ import org.goodmath.polytope.common.stashable.ArtifactVersion
 import org.goodmath.polytope.common.stashable.Id
 import org.goodmath.polytope.common.stashable.newId
 import org.goodmath.polytope.common.util.ParsingCommons
+import java.nio.file.Path
+import kotlin.io.path.readLines
+import kotlin.io.path.writeLines
+import kotlin.text.Charsets.UTF_8
 
 
-data class Text(
+data class TextContent(
     val content: List<String>
 )
 
@@ -169,7 +173,7 @@ data class MergeBlock(
                     MergeConflict(
                         id = newId<MergeConflict>("textMerge"),
                         artifactId = artifactId,
-                        artifactType = TextAgent.artifactType,
+                        artifactType = TextContentAgent.artifactType,
                         sourceVersion = sourceVersionId,
                         targetVersion = targetVersionId,
                         details = ParsingCommons.klaxon.toJsonString(
@@ -184,18 +188,27 @@ data class MergeBlock(
 }
 
 
-object TextAgent: Agent<Text> {
+object TextContentAgent: FileAgent<TextContent> {
+    override fun readFromDisk(path: Path): TextContent {
+        val text = path.readLines(UTF_8)
+        return TextContent(text)
+    }
+
+    override fun writeToDisk(path: Path, value: TextContent) {
+        path.writeLines(value.content)
+    }
+
     override val artifactType: String = "text"
 
 
     /**
      * Convert a text content to an array of bytes.
      */
-    override fun encodeToString(content: Text): String {
+    override fun encodeToString(content: TextContent): String {
         return content.content.joinToString("")
     }
 
-    override fun decodeFromString(content: String): Text {
+    override fun decodeFromString(content: String): TextContent {
         val result = ArrayList<String>()
         var builder = StringBuffer()
         for (c in content.chars()) {
@@ -208,7 +221,7 @@ object TextAgent: Agent<Text> {
         if (builder.isNotEmpty()) {
             result.add(builder.toString())
         }
-        return Text(result)
+        return TextContent(result)
     }
 
     override fun merge(
@@ -260,9 +273,9 @@ object TextAgent: Agent<Text> {
         ancestorVersionId: Id<ArtifactVersion>,
         sourceVersionId: Id<ArtifactVersion>,
         targetVersionId: Id<ArtifactVersion>,
-        base: Text,
-        mergeSrc: Text,
-        mergeTgt: Text
+        base: TextContent,
+        mergeSrc: TextContent,
+        mergeTgt: TextContent
     ): MergeResult {
         val labSrc = createLabelledList(base.content, mergeSrc.content)
         val labTgt = createLabelledList(base.content, mergeTgt.content)
@@ -284,7 +297,7 @@ object TextAgent: Agent<Text> {
             ancestorVersion = ancestorVersionId,
             sourceVersion = sourceVersionId,
             targetVersion = targetVersionId,
-            proposedMerge = encodeToString(Text(result)),
+            proposedMerge = encodeToString(TextContent(result)),
             conflicts = allConflicts)
     }
 
