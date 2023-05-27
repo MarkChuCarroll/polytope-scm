@@ -21,8 +21,9 @@ import maryk.rocksdb.openRocksDB
 import org.goodmath.polytope.Config
 import org.goodmath.polytope.common.agents.Agent
 import org.goodmath.polytope.common.agents.BaselineAgent
+import org.goodmath.polytope.common.agents.BinaryContentAgent
 import org.goodmath.polytope.common.agents.DirectoryAgent
-import org.goodmath.polytope.common.agents.text.TextAgent
+import org.goodmath.polytope.common.agents.text.TextContentAgent
 import org.goodmath.polytope.depot.stashes.*
 import org.goodmath.polytope.depot.stashes.WorkspaceStash
 import org.rocksdb.ColumnFamilyDescriptor
@@ -30,7 +31,6 @@ import org.rocksdb.ColumnFamilyHandle
 import kotlin.io.path.Path
 import kotlin.io.path.exists
 import kotlin.text.Charsets.UTF_8
-
 
 class Depot(cfg: Config) {
     companion object {
@@ -75,7 +75,7 @@ class Depot(cfg: Config) {
 
     val db: RocksDB
     private val cfHandles: Map<String, ColumnFamilyHandle>
-    val agents = listOf(DirectoryAgent, TextAgent, BaselineAgent)
+    val agents = listOf(DirectoryAgent, TextContentAgent, BaselineAgent, BinaryContentAgent)
 
     init {
         val dbPath = Path(cfg.dbPath)

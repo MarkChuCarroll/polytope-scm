@@ -422,6 +422,27 @@ class WorkspaceStash(
         return artId
     }
 
+    fun pathExistsInWorkspace(auth: AuthenticatedUser, ws: Workspace, pathParts: List<String>): Boolean {
+        val cbl = currentBaseline(auth, ws)
+        val rootDir = cbl.rootDir
+        var artId: Id<Artifact> = rootDir
+        for (part in pathParts) {
+            val art = depot.artifacts.retrieveVersion(
+                auth, ws.project,
+                artId, cbl.entries[artId]!!
+            )
+            if (art.artifactType != DirectoryAgent.artifactType) {
+                throw PtException(
+                    PtException.Kind.NotFound,
+                    "Invalid path ${pathParts.joinToString("/")}"
+                )
+            }
+            val dir = DirectoryAgent.decodeFromString(art.content)
+            artId = dir.getBinding(part) ?: return false
+        }
+        return true
+    }
+
     /**
      * Get the current contents of the directory object located at a path in
      * the workspace.
@@ -593,8 +614,13 @@ class WorkspaceStash(
         val oldPathDir = oldPathParts.dropLast(1)
         val oldName = oldPathParts.last()
         val newPathParts = newPath.split("/")
-        val newPathDir = newPathParts.dropLast(1)
-        val newName = newPathParts.last()
+        val (newPathDir, newName) = if (!pathExistsInWorkspace(auth, ws, newPathParts)) {
+            val newPathDir = newPathParts.dropLast(1)
+            val newName = newPathParts.last()
+            Pair(newPathDir, newName)
+        } else {
+            Pair(newPathParts, oldName)
+        }
 
         if (oldPathDir.joinToString("/") == newPathDir.joinToString("/")) {
             val oldDirId = getArtifactAtPath(auth, ws, oldPathDir)

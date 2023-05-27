@@ -13,8 +13,7 @@ import java.nio.file.Path
  * should be able to provide filename hints and content tests
  * to determine if they're the correct agent for the file.
  */
-class FileType private constructor(
-    val typeName: String) {
+class FileType private constructor(val typeName: String) {
 
     override fun toString(): String {
         return "FileType($typeName)"

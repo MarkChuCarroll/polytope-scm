@@ -16,6 +16,7 @@
 
 package org.goodmath.polytope.common.agents.text
 
+import org.goodmath.polytope.common.agents.ContentHashable
 import org.goodmath.polytope.common.agents.FileAgent
 import org.goodmath.polytope.common.agents.MergeConflict
 import org.goodmath.polytope.common.agents.MergeResult
@@ -23,7 +24,9 @@ import org.goodmath.polytope.common.stashable.Artifact
 import org.goodmath.polytope.common.stashable.ArtifactVersion
 import org.goodmath.polytope.common.stashable.Id
 import org.goodmath.polytope.common.stashable.newId
+import org.goodmath.polytope.common.util.FileType
 import org.goodmath.polytope.common.util.ParsingCommons
+import java.io.File
 import java.nio.file.Path
 import kotlin.io.path.readLines
 import kotlin.io.path.writeLines
@@ -32,7 +35,14 @@ import kotlin.text.Charsets.UTF_8
 
 data class TextContent(
     val content: List<String>
-)
+): ContentHashable {
+    override fun contentHash(): String =
+        TextContentAgent.contentHash(this)
+
+    override fun encodeAsString(): String {
+        return TextContentAgent.encodeToString(this)
+    }
+}
 
 data class TextMergeConflict(
     val conflictStart: Int,
@@ -189,9 +199,23 @@ data class MergeBlock(
 
 
 object TextContentAgent: FileAgent<TextContent> {
+    val extensions = hashSetOf("txt", "java", "kt", "js", "ts", "json", "txt",
+        "rs", "py", "rb", "ltx", "tex", "md", "yaml")
+    override fun canHandle(file: File): Boolean {
+        return (file.extension in extensions) || FileType.of(file) == FileType.text
+    }
+
     override fun readFromDisk(path: Path): TextContent {
         val text = path.readLines(UTF_8)
         return TextContent(text)
+    }
+
+    override fun stringFromDisk(path: Path): String {
+        TODO("Not yet implemented")
+    }
+
+    override fun stringToDisk(path: Path, content: String) {
+        TODO("Not yet implemented")
     }
 
     override fun writeToDisk(path: Path, value: TextContent) {

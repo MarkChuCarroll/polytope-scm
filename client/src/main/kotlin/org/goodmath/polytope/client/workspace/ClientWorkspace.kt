@@ -7,9 +7,11 @@ import maryk.rocksdb.openRocksDB
 import org.goodmath.polytope.common.PtException
 import org.goodmath.polytope.common.WorkspaceFileContents
 import org.goodmath.polytope.common.agents.BinaryContentAgent
+import org.goodmath.polytope.common.agents.ContentHashable
 import org.goodmath.polytope.common.agents.FileAgent
 import org.goodmath.polytope.common.agents.text.TextContentAgent
 import org.goodmath.polytope.common.util.FileType
+import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -19,12 +21,6 @@ import kotlin.io.path.*
 private const val workspaceRecordKey = "workspace"
 private const val stateMapKey = "file_states"
 
-
-data class FileState(
-    val path: String,
-    val hash: String,
-    val type: String
-)
 
 /**
  * A structure for storing state in the client.
@@ -39,6 +35,12 @@ data class FileState(
 data class StateMap(
     private val fileStates: MutableMap<String, FileState>
 ) {
+    data class FileState(
+        val path: String,
+        val hash: String,
+        val type: String
+    )
+
     val paths: Set<String>
         get() = fileStates.keys
 
@@ -74,8 +76,13 @@ data class FileChanges(
 )
 
 class ClientWorkspace(val cfg: ClientConfig, val name: String) {
+    val logger = LoggerFactory.getLogger(ClientWorkspace::class.java)
+    
     private val fileAgents = mapOf(TextContentAgent.artifactType to TextContentAgent,
         BinaryContentAgent.artifactType to BinaryContentAgent)
+
+    fun agentFor(file: File): FileAgent<out ContentHashable> =
+        fileAgents.values.first { it.canHandle(file) }
 
     /**
      * List the paths of all tracked files in the workspace
@@ -101,21 +108,21 @@ class ClientWorkspace(val cfg: ClientConfig, val name: String) {
             if (agent != null) {
                 val fileHash = computeHash(StringReader(file.content))
                 if (file.path !in stateMap.paths) {
-                    System.err.println("Adding new retrieved file ${file.path}")
+		    logger.info("Adding new retrieved file ${file.path}")
                     val path = Path(file.path)
                     if (!path.parent.exists()) {
                         path.parent.toFile().mkdirs()
                     }
                     agent.stringToDisk(path, file.content)
                 } else {
-                    if (fileHash != stateMap[file.path]?.hash) {
-                        System.err.println("Updating existing file ${file.path}")
+		    if (fileHash != stateMap[file.path]?.hash) {
+			logger.info("Updating existing file ${file.path}")
                         agent.stringToDisk(Path(file.path), file.content)
                     } else {
-                        System.err.println("File ${file.path} did not need to be updated")
+                        logger.info("File ${file.path} did not need to be updated")
                     }
                 }
-                newStateMap[file.path] = FileState(file.path, fileHash, file.artifactType)
+                newStateMap[file.path] = StateMap.FileState(file.path, fileHash, file.artifactType)
             }
         }
         val deadPaths = stateMap.paths - paths.toSet()
@@ -125,6 +132,10 @@ class ClientWorkspace(val cfg: ClientConfig, val name: String) {
         saveState(newState, newStateMap)
     }
 
+    /**
+     * Utility function that checks that the workspace is open on a change. If not,
+     * then an exception will be thrown.
+     */
     private fun requireChange(wsState: Workspace) {
         if (wsState.change == null) {
             throw PtException(
@@ -147,6 +158,12 @@ class ClientWorkspace(val cfg: ClientConfig, val name: String) {
         return result
     }
 
+    /**
+     * Add a list of files to the set of files tracked by the project.
+     * @param paths the list of paths to be added. These must be inside the workspace directory.
+     * @param recursive if true, and any of the files listed is a directory, then all
+     *    the files under the directory will be added.
+     */
     suspend fun addFiles(paths: List<String>, recursive: Boolean) {
         val stateMap = getStateMap()
         val wsState = getState()
@@ -163,22 +180,29 @@ class ClientWorkspace(val cfg: ClientConfig, val name: String) {
         var updated: Workspace = wsState
         for (p in pathsToAdd) {
             val fileType = FileType.of(File(p))
-            val agent: FileAgent<out Any> = if (fileType == FileType.binary) {
+            val agent: FileAgent<out ContentHashable> = if (fileType == FileType.binary) {
                 BinaryContentAgent
             } else {
                 TextContentAgent
             }
-            val (contentObject, hash) = agent.readStringWithHash(Path(p))
-            val content = WorkspaceFileContents(p, agent.artifactType, contentObject)
+            val contentObject = agent.readFromDisk(Path(p))
+            val hash = contentObject.contentHash()
+            val content = WorkspaceFileContents(p, agent.artifactType, contentObject.encodeAsString())
             updated = apiClient.workspaceAddFile(
                 wsState.project, wsState.name, p,
                 content
             )
-            stateMap[p] = FileState(p, hash, agent.artifactType)
+            stateMap[p] = StateMap.FileState(p, hash, agent.artifactType)
         }
         saveState(updated, stateMap)
     }
 
+    /**
+     * Delete a tracked file from the workspace.
+     * @param path the path of the file to delete.
+     * @param really if true, the file will be deleted; if false, then it will be removed
+     *    from the set of tracked files, but the file will not be deleted.
+     */
     suspend fun deleteFile(path: String, really: Boolean): List<String> {
         val stateMap = getStateMap()
         if (path !in stateMap.paths && !Path(path).exists()) {
@@ -207,10 +231,11 @@ class ClientWorkspace(val cfg: ClientConfig, val name: String) {
     suspend fun moveFile(fromPath: String, toPath: String) {
         val wsState = getState()
         requireChange(wsState)
-        val updated = apiClient.workspaceMoveFile(
+        var state = wsState
+        state = apiClient.workspaceMoveFile(
             wsState.project, wsState.name, fromPath, toPath
         )
-        populate(updated)
+        populate(state)
     }
 
     suspend fun openHistory(history: String) {

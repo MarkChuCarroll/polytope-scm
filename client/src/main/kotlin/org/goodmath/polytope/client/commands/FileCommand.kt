@@ -9,9 +9,15 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.choice
 import kotlinx.coroutines.runBlocking
+import org.goodmath.polytope.client.workspace.ClientWorkspace
 import org.goodmath.polytope.client.workspace.WorkspaceConfig
 import org.goodmath.polytope.common.PtException
+import org.goodmath.polytope.common.WorkspaceFileContents
+import org.goodmath.polytope.common.agents.Directory
+import org.goodmath.polytope.common.agents.DirectoryAgent
+import org.goodmath.polytope.common.stashable.Workspace
 import java.io.File
+import kotlin.io.path.*
 
 
 class FileCommand : PolytopeCommandBase("file", help = "Manipulate files in a polytope workspace.") {
@@ -23,6 +29,7 @@ class FileCommand : PolytopeCommandBase("file", help = "Manipulate files in a po
             FileCommand().subcommands(
                 FileListCommand(),
                 FileAddCommand(),
+                FileMkdirCommand(),
                 FileMoveCommand(),
                 FileDeleteCommand(),
                 FileIgnoreCommand()
@@ -49,15 +56,32 @@ class FileAddCommand : PolytopeCommandBase("add", help = "Add a new tracked file
 }
 
 class FileMoveCommand : PolytopeCommandBase("mv", "Move a tracked file inside of a workspace.") {
-    private val fromPath: String by argument(help = "the file to move")
+    private val fromPaths: List<String> by argument(help = "the file to move").multiple()
     private val toPath: String by argument(help = "the place to move it to")
     override fun run() {
-        // TODO: this should be able to handle multiple things to move (like mv),
-        // and the target should be able to be either a complete path, or a directory name.
+
         handleCommandErrors("file", "mv") {
             val ws = requireWorkspace()
-            runBlocking {
-                ws.moveFile(fromPath, toPath)
+            if (fromPaths.size > 1) {
+                val dirPath = Path(toPath)
+                if (!dirPath.isDirectory()) {
+                    throw PtException(
+                        PtException.Kind.InvalidParameter,
+                        "When moving multiple files, the target path must be a directory"
+                    )
+                } else {
+                    runBlocking {
+                        for (from in fromPaths) {
+                            val name = Path(from).name
+                            val fullToPath = dirPath / name
+                            ws.moveFile(from, fullToPath.toString())
+                        }
+                    }
+                }
+            } else {
+                runBlocking {
+                    ws.moveFile(fromPaths[0], toPath)
+                }
             }
         }
     }
@@ -95,7 +119,9 @@ class FileDeleteCommand : PolytopeCommandBase("rm", "Delete files in the workspa
     }
 }
 
-class FileListCommand : PolytopeCommandBase("list", help = "List the tracked, versioned artifacts in the workspace") {
+class FileListCommand : PolytopeCommandBase(
+			    "list",
+			    help = "List the tracked, versioned artifacts in the workspace") {
     private val format: String by option("-f", "--format", help = "the output format")
         .choice("text", "json")
         .default("text")
@@ -117,15 +143,60 @@ class FileListCommand : PolytopeCommandBase("list", help = "List the tracked, ve
     }
 }
 
-class FileIgnoreCommand: PolytopeCommandBase("ignore", help="Tell the polytope client to ignore files in the workspace") {
-    val pattern by argument("pattern", help="a glob expression describing files to be ignored")
+class FileMkdirCommand : PolytopeCommandBase(
+			     "mkdir",
+			     help = "Create a tracked directory in a polytope workspace") {
+    private val makeIntermediates by option(
+        "-p",
+        "--make-intermediates",
+        help = "If true, then automatically make any intermediate directories"
+    ).flag(default = false)
+    private val dir by argument(name="directory", help="the name of the directory to create")
+
+    suspend fun mkdir(ws: ClientWorkspace, allPaths: Set<String>, dirPath: String) {
+        val parentPath = Path(dirPath).parent.pathString
+        if (parentPath !in allPaths) {
+            mkdir(ws, allPaths, parentPath)
+        }
+        File(dirPath).mkdir()
+        // Make a directory object, and add it.
+        val dirContent = Directory()
+        ws.apiClient.workspaceAddFile(
+	    ws.project,
+	    ws.name,
+	    dirPath,
+	    WorkspaceFileContents(dirPath, DirectoryAgent.artifactType,
+				  DirectoryAgent.encodeToString(dirContent)))
+    }
+
+    override fun run() {
+        val ws = requireWorkspace()
+        runBlocking {
+            val allPaths = ws.apiClient.workspaceListPaths(ws.project, ws.name).paths.toSet()
+            val parentPath = Path(dir).parent.pathString
+            if (!makeIntermediates && parentPath  !in allPaths) {
+                throw PtException(PtException.Kind.NotFound,
+                    "Parent directory $parentPath does not exist")
+            } else {
+                mkdir(ws, allPaths, dir)
+            }
+        }
+    }
+
+}
+
+class FileIgnoreCommand :
+    PolytopeCommandBase("ignore", help = "Tell the polytope client to ignore files in the workspace") {
+    private val pattern by argument("pattern", help = "a glob expression describing files to be ignored")
     override fun run() {
         handleCommandErrors("file", "ignore") {
             val ws = requireWorkspace()
             val wsCfg = WorkspaceConfig.load(ws.cfg.wsPath)
-                ?: throw PtException(PtException.Kind.Internal,
-                    "Workspace configuration is invalid")
-            val updated = wsCfg.copy(ignorePatterns =  wsCfg.ignorePatterns + pattern)
+                ?: throw PtException(
+                    PtException.Kind.Internal,
+                    "Workspace configuration is invalid"
+                )
+            val updated = wsCfg.copy(ignorePatterns = wsCfg.ignorePatterns + pattern)
             updated.save(ws.cfg.wsPath)
         }
     }
