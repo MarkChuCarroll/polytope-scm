@@ -14,36 +14,29 @@
  * limitations under the License.
  */
 
-
 val guavaVersion: String by project
 val hopliteVersion: String by project
 val junitVersion: String by project
 val klaxonVersion: String by project
 val kotlinLibVersion: String by project
 val kotlinSerializationVersion: String by project
-val kotlinVersion: String by project
 val logbackVersion: String by project
 val mockkVersion: String by project
 val rocksDbVersion: String by project
 val slf4jVersion: String by project
-
-
-
 
 plugins {
     id("org.jetbrains.kotlin.jvm") version "1.8.10"
     kotlin("plugin.serialization") version "1.8.10"
     id("io.ktor.plugin") version "2.3.0"
     application
-
 }
 
 kotlin {
     jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
-
 
 repositories {
     mavenCentral()
@@ -91,4 +84,3 @@ application {
 tasks.named<Test>("test") {
     useJUnitPlatform()
 }
-

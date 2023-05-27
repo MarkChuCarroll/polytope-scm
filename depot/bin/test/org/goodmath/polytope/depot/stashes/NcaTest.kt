@@ -1,7 +1,7 @@
 package org.goodmath.polytope.depot.stashes
 
 import org.goodmath.polytope.TestStub
-import org.goodmath.polytope.common.agents.text.TextAgent
+import org.goodmath.polytope.common.agents.text.TextContentAgent
 import org.goodmath.polytope.common.stashable.Artifact
 import org.goodmath.polytope.common.stashable.ArtifactVersion
 import org.goodmath.polytope.common.stashable.AuthenticatedUser
@@ -49,7 +49,7 @@ class NcaTest: TestStub() {
             auth,
             "testie",
             artifactId,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "aaaaaaa\n",
             listOf(rootVersion),
             emptyMap()
@@ -59,7 +59,7 @@ class NcaTest: TestStub() {
             auth,
             "test%e",
             artifactId,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "bbbbbb\n",
             listOf(aVer.id), emptyMap()
         )
@@ -68,7 +68,7 @@ class NcaTest: TestStub() {
             auth,
             "testie",
             artifactId,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "cccccccc\n",
             listOf(bVer.id),
 
@@ -80,7 +80,7 @@ class NcaTest: TestStub() {
             auth,
             "testie",
             artifactId,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "dddddddd\n",
             listOf(aVer.id),
 
@@ -92,7 +92,7 @@ class NcaTest: TestStub() {
             auth,
             "testie",
             artifactId,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "gggggggg\n",
             listOf(bVer.id),
 
@@ -103,7 +103,7 @@ class NcaTest: TestStub() {
             auth,
             "testie",
             artifactId,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "eeeeeeee\n",
             listOf(dVer.id),
 
@@ -114,7 +114,7 @@ class NcaTest: TestStub() {
             auth,
             "testie",
             artifactId,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "ffffffff\n",
             listOf(cVer.id, gVer.id),
 
@@ -125,7 +125,7 @@ class NcaTest: TestStub() {
             auth,
             "testie",
             artifactId,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "jjjjjjjj\n",
             listOf(gVer.id),
 
@@ -136,7 +136,7 @@ class NcaTest: TestStub() {
             auth,
             "testie",
             artifactId,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "iiiiiiii\n",
             listOf(eVer.id, fVer.id),
 
@@ -147,7 +147,7 @@ class NcaTest: TestStub() {
             auth,
             "testie",
             artifactId,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "kkkkkkkk\n",
             listOf(gVer.id, iVer.id),
 
@@ -158,7 +158,7 @@ class NcaTest: TestStub() {
             auth,
             "testie",
             artifactId,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "llllllll\n",
             listOf(eVer.id),
 
@@ -169,7 +169,7 @@ class NcaTest: TestStub() {
             auth,
             "testie",
             artifactId,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "hhhhhhhh\n",
             listOf(eVer.id),
 
@@ -189,7 +189,7 @@ class NcaTest: TestStub() {
         val (artifact, rootVer) = depot.artifacts.createArtifact(
             auth,
             pr.name,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "00000000\n",
             emptyMap()
         )
@@ -253,7 +253,7 @@ class NcaTest: TestStub() {
         val (artifact, rootVer) = depot.artifacts.createArtifact(
             auth,
             pr.name,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "00000000\n",
             emptyMap()
         )
@@ -288,7 +288,7 @@ class NcaTest: TestStub() {
         val (artifact, rootVer) = depot.artifacts.createArtifact(
             auth,
             pr.name,
-            TextAgent.artifactType,
+            TextContentAgent.artifactType,
             "00000000\n",
             emptyMap()
         )

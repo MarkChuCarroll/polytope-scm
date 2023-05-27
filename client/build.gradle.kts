@@ -50,7 +50,6 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json")
     implementation("io.ktor:ktor-client-auth")
 
-
     implementation("io.maryk.rocksdb:rocksdb-multiplatform:$rocksDbVersion")
     implementation("com.beust:klaxon:$klaxonVersion")
     implementation("com.sksamuel.hoplite:hoplite-core:$hopliteVersion")
@@ -60,7 +59,6 @@ dependencies {
     implementation("org.slf4j:slf4j-api:$slf4jVersion")
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
     implementation("io.maryk.rocksdb:rocksdb-multiplatform:$rocksDbVersion")
-
 
     // Testing
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
@@ -79,6 +77,6 @@ tasks.named<Test>("test") {
 
 kotlin {
     jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }

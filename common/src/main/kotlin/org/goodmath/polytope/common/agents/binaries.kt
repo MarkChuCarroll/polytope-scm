@@ -3,7 +3,9 @@ package org.goodmath.polytope.common.agents
 import org.goodmath.polytope.common.stashable.ArtifactVersion
 import org.goodmath.polytope.common.stashable.ID_CONFLICT
 import org.goodmath.polytope.common.stashable.newId
+import org.goodmath.polytope.common.util.FileType
 import org.goodmath.polytope.common.util.ParsingCommons
+import java.io.File
 import java.nio.file.Path
 import java.util.Base64
 import kotlin.io.path.readBytes
@@ -11,19 +13,23 @@ import kotlin.io.path.writeBytes
 
 data class BinaryContent(
     val content: ByteArray
-) {
+) : ContentHashable {
+    override fun contentHash(): String =
+        BinaryContentAgent.contentHash(this)
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
 
         other as BinaryContent
-
         return content.contentEquals(other.content)
     }
 
     override fun hashCode(): Int {
         return content.contentHashCode()
     }
+
+
 }
 
 data class BinaryMergeConflict(
@@ -41,6 +47,15 @@ data class BinaryMergeConflict(
 
 }
 object BinaryContentAgent: FileAgent<BinaryContent> {
+    private val extensions = hashSetOf("bin", "exe", "jar", "zip", "gz", "tgz", "class")
+    override fun canHandle(file: File): Boolean {
+        return if (file.extension in extensions) {
+            true
+        } else {
+            FileType.of(file) == FileType.binary
+        }
+    }
+
     override fun readFromDisk(path: Path): BinaryContent {
         val bytes = path.readBytes()
         return BinaryContent(bytes)

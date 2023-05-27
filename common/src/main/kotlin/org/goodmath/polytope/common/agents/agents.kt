@@ -18,6 +18,7 @@ package org.goodmath.polytope.common.agents
 import org.goodmath.polytope.common.stashable.Artifact
 import org.goodmath.polytope.common.stashable.ArtifactVersion
 import org.goodmath.polytope.common.stashable.Id
+import java.io.File
 import java.lang.StringBuilder
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -74,9 +75,27 @@ interface Agent<T> {
         target: ArtifactVersion
     ): MergeResult
 
+    fun merge(startVersion: ArtifactVersion,
+              endVersion: ArtifactVersion,
+              targetVersion: ArtifactVersion,
+              nearestCommonAncestor: ArtifactVersion): MergeResult
+
+
 }
 
-interface FileAgent<T>: Agent<T> {
+interface ContentHashable {
+    fun contentHash(): String
+    fun encodeAsString(): String
+}
+
+interface FileAgent<T: ContentHashable>: Agent<T> {
+
+    /**
+     * Given a reference to a file, return "true" if the file is a type that
+     * can be processed by the agent.
+     */
+    fun canHandle(file: File): Boolean
+
     fun readFromDisk(path: Path): T
     fun writeToDisk(path: Path, value: T)
 

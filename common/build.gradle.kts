@@ -24,8 +24,8 @@ val logbackVersion: String by project
 val mockkVersion: String by project
 
 plugins {
-    id("org.jetbrains.kotlin.jvm") version "1.8.10"
-    kotlin("plugin.serialization") version "1.8.10"
+    id("org.jetbrains.kotlin.jvm") version "1.9.23"
+    kotlin("plugin.serialization") version "1.9.23"
     id("io.ktor.plugin") version "2.3.0"
 }
 
@@ -57,7 +57,7 @@ tasks.named<Test>("test") {
 
 kotlin {
     jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
 
