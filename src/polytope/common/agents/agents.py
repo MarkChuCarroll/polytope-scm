@@ -1,0 +1,85 @@
+# Copyright 2025 Mark C. Chu-Carroll
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from abc import abstractmethod
+import hashlib
+import textwrap
+from typing import List, NamedTuple, Protocol, Tuple
+from polytope.common.stashable.artifact import Artifact, ArtifactVersion
+from polytope.common.stashable.ids import Id
+
+class MergeConflict(NamedTuple):
+    id: Id["MergeConflict"]
+    artifact_id: Id[Artifact]
+    artifact_type: str
+    source_version: Id[ArtifactVersion]
+    target_version: Id[ArtifactVersion]
+    details: bytes
+
+    def __repr__(self) -> str:
+        return textwrap.dedent(f"""\
+            Conflict: {self.id} on {self.artifact_id}
+            Artifact type: {self.artifact_type}
+            Source version: {self.source_version}
+            Target version: {self.target_version}
+            """)
+
+class MergeResult(NamedTuple):
+    artifact_type: str
+    artifact_id: Id[Artifact]
+    ancestor_version: Id[ArtifactVersion]
+    source_version: Id[ArtifactVersion]
+    target_version: Id[ArtifactVersion]
+    proposed_merge: bytes
+    conflicts: List[MergeConflict]
+
+
+class Agent[T](Protocol):
+    @property
+    def artifact_type(self) -> str: ...
+
+    def encode_to_bytes(self, content: T) -> bytes: ...
+    def decode_from_bytes(self, content: bytes) -> T: ...
+
+    def content_hash(self, content: T) -> str:
+        s = self.encode_to_bytes(content)
+        sha = hashlib.sha256()
+        sha.update(s)
+        return sha.hexdigest()
+
+    def merge(
+        self,
+        ancestor: ArtifactVersion,
+        source: ArtifactVersion,
+        target: ArtifactVersion,
+    ) -> MergeResult: ...
+
+
+
+class FileAgent[T](Agent[T]):
+    # Given a reference to a file, return "true" if the file is a type that
+    # can be processed by the agent.
+    @abstractmethod
+    def can_handle(self, file: str) -> bool: ...
+
+    @abstractmethod
+    def read_from_disk(self, path: str) -> T: ...
+
+    @abstractmethod
+    def write_to_disk(self, path: str, value: T) -> None: ...
+
+    def bytes_to_disk(self, path: str, content: bytes) -> None:
+        with open(path, "wb") as out:
+            out.write(content)
+

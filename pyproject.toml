@@ -1,0 +1,32 @@
+[project]
+name = "polytope"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+licence = "Apache-2.0"
+license-files = ["LICENSE" ]
+requires-python = ">=3.14"
+dependencies = [
+ "mypy>=1.19.1",
+ "pytest>=9.0.2",
+]
+authors = [
+   { name = "Mark C. Chu-Carroll", email = "markcc@gmail.com"}
+]
+classifiers = [
+ "Development Status :: 3 - Alpha",
+
+  # Indicate who your project is intended for
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Build Tools",
+]
+
+
+
+[build-system]
+requires = ["uv_build >= 0.9.17, <0.10.0"]
+build-backend = "uv_build"
+
+[pycodestyle]
+max-line-length = 100
+
