@@ -20,11 +20,13 @@ from polytope.common.error import ErrorKind, PtException
 from polytope.common.stashable.artifact import ArtifactVersion
 from polytope.common.stashable.ids import Id
 
+
 class PVSKind(Enum):
     History = "h"
     HistoryVersion = "hv"
     Change = "c"
     Baseline = "b"
+
 
 class ProjectVersionSpecifier:
     def __init__(self,
@@ -45,7 +47,7 @@ class ProjectVersionSpecifier:
     @classmethod
     def make_history(cls, project: str, history: str, idx: int | None) -> "ProjectVersionSpecifier":
         if idx is None:
-            return cls(PVSKind.History, project = project, history=history)
+            return cls(PVSKind.History, project=project, history=history)
         else:
             return cls(PVSKind.HistoryVersion, project=project, history=history, idx=idx)
 
@@ -60,19 +62,19 @@ class ProjectVersionSpecifier:
             "history": self.history,
             "change": self.change,
             "idx": self.idx,
-            "baseline": (self.baseline is None if None else str(self.baseline))
+            "baseline": (None if self.baseline is None else str(self.baseline))
         }
 
     @classmethod
     def from_dict(cls, dict: Dict[str, Any]) -> "ProjectVersionSpecifier":
         return ProjectVersionSpecifier(
-                kind = PVSKind[dict["kind"]],
-                project = dict["project"],
-                history = dict["history"],
-                change=dict["change"],
-                idx = dict["idx"],
-                baseline= dict["baseline"] is None if None else Id.from_string(dict["baseline"])
-            )
+            kind=PVSKind(dict["kind"]),
+            project=dict["project"],
+            history=dict["history"],
+            change=dict["change"],
+            idx=dict["idx"],
+            baseline=None if dict["baseline"] is None else Id.from_string(dict["baseline"])
+        )
 
     def __repr__(self) -> str:
         match self.kind:
@@ -104,7 +106,7 @@ class ProjectVersionSpecifier:
                 return cls.parseHistoryVersionSpecifier(parts[1])
             case 'c':
                 return cls.parseChangeVersionSpecifier(parts[1])
-            case 'hs':
+            case 'hv':
                 return cls.parseHistoryIndexVersionSpecifier(parts[1])
             case 'cs':
                 return cls.parseChangeStepVersionSpecifier(parts[1])
@@ -122,7 +124,7 @@ class ProjectVersionSpecifier:
         m = regex.fullmatch(spec)
         if m is not None:
             return ProjectVersionSpecifier(PVSKind.History,
-                m.group(1), m.group(2))
+                                           m.group(1), m.group(2))
         else:
             raise PtException(ErrorKind.Parsing,
                               f"A history version specifier should have two parts,  recieved: '{spec}'")
@@ -164,7 +166,6 @@ class ProjectVersionSpecifier:
             raise PtException(ErrorKind.Parsing,
                               "A Change step version specifier must include an index")
 
-
     @classmethod
     def parseBaselineVersionSpecifier(cls, spec: str) -> "ProjectVersionSpecifier":
         regex = re.compile(r"([A-Za-z0-9_-]+)/([A-Za-z0-9]+)@(.*)")
@@ -172,9 +173,7 @@ class ProjectVersionSpecifier:
         if m is not None:
             return ProjectVersionSpecifier(PVSKind.Baseline,
                                            m.group(1), m.group(2),
-                                            baseline=Id.from_string(m.group(3)))
+                                           baseline=Id.from_string(m.group(3)))
         else:
             raise PtException(ErrorKind.Parsing,
                               f"Invalid baseline specifier: `{spec}`")
-
-

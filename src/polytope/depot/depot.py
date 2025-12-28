@@ -1,55 +1,62 @@
+from re import S
+from typing import TYPE_CHECKING, Dict, List, cast
 
-from logging import config
-from typing import Dict, List, cast
-from polytope.common.agents.agents import Agent
-from polytope.common.agents.baseline import BaselineAgent
-from polytope.common.agents.directory import DirectoryAgent
-from polytope.common.agents.text import TextAgent
+import os
+from pymongo import MongoClient
+
+
 from polytope.depot.config import Config
-from polytope.depot.stashes.project_stash import ProjectStash
-from polytope.depot.stashes.artifact_stash import ArtifactStash
-from polytope.depot.stashes.change_stash import ChangeStash
-from polytope.depot.stashes.history_stash import HistoryStash
 from polytope.depot.stashes.stash import Stash
-from polytope.depot.stashes.user_stash import UserStash
+from polytope.depot.storage.storage import FileStorage
+
+if TYPE_CHECKING:
+    from polytope.common.agents.agents import Agent
+    from polytope.common.agents.baseline import BaselineAgent
+    from polytope.common.agents.directory import DirectoryAgent
+    from polytope.common.agents.text import TextAgent
+    from polytope.depot.stashes.artifact_stash import ArtifactStash
+    from polytope.depot.stashes.change_stash import ChangeStash
+    from polytope.depot.stashes.history_stash import HistoryStash
+    from polytope.depot.stashes.project_stash import ProjectStash
+    from polytope.depot.stashes.user_stash import UserStash
 
 
 class Depot:
+    """The storage system for all polytope data."""
 
     def __init__(self, config: Config) -> None:
-        self.db_dir = config.db_dir
-        self.stashes: Dict[str, Stash] = {
-            "user": UserStash(config.db_dir, self),
-            "artifact": ArtifactStash(config.db_dir, self),
-            "change": ChangeStash(config.db_dir, self),
-            "history": HistoryStash(config.db_dir, self),
-            "project": ProjectStash(config.db_dir, self),
-        }
+        """Initialize a depot."""
+        print(f"Connection str: {config["db"]["connection_str"]}")
+        self.mongo: MongoClient = MongoClient(config["db"]["connection_str"])
+        self.db = self.mongo.get_database(config["db"]["db_name"])
 
-        agents: List[Agent] = [ TextAgent.get(), DirectoryAgent.get(),
-                  BaselineAgent.get() ]
-        self.agents = { agent.artifact_type: agent for agent in agents }
+        self.storage = FileStorage(config["storage"]["storage_path"])
+        from polytope.depot.stashes.artifact_stash import ArtifactStash
+        from polytope.depot.stashes.change_stash import ChangeStash
+        from polytope.depot.stashes.history_stash import HistoryStash
+        from polytope.depot.stashes.project_stash import ProjectStash
+        from polytope.depot.stashes.user_stash import UserStash
+        from polytope.common.agents.directory import DirectoryAgent
+        from polytope.common.agents.baseline import BaselineAgent
+        from polytope.common.agents.text import TextAgent
 
-        for stash in self.stashes.values():
-            stash.init_storage(config)
+        agents: List[Agent] = [
+            TextAgent(self.storage),
+            DirectoryAgent(self.storage),
+            BaselineAgent(self.storage)
+        ]
+        self.agents = {agent.artifact_type(): agent for agent in agents}
 
-    @property
-    def project_stash(self) -> ProjectStash:
-        return cast(ProjectStash, self.stashes["project"])
+        self.user_stash = UserStash(self)
+        self.artifact_stash = ArtifactStash(self)
+        self.change_stash = ChangeStash(self)
+        self.history_stash = HistoryStash(self)
+        self.project_stash = ProjectStash(self)
+        self.user_stash.init_storage(config)
+        self.artifact_stash.init_storage(config)
+        self.change_stash.init_storage(config)
+        self.history_stash.init_storage(config)
+        self.project_stash.init_storage(config)
 
-    @property
-    def user_stash(self) -> UserStash:
-        return cast(UserStash, self.stashes["user"])
-
-    @property
-    def artifact_stash(self) -> ArtifactStash:
-        return cast(ArtifactStash, self.stashes["artifacts"])
-
-    @property
-    def history_stash(self) -> HistoryStash:
-        return cast(HistoryStash, self.stashes["history"])
-
-    @property
-    def change_stash(self) -> ChangeStash:
-        return cast(ChangeStash, self.stashes["changes"])
-
+    def get_agent(self, s: str) -> Agent:
+        return self.agents[s]

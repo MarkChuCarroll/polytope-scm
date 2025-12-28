@@ -1,14 +1,16 @@
 [project]
 name = "polytope"
 version = "0.1.0"
-description = "Add your description here"
+description = "Version control done right - again."
 readme = "README.md"
 licence = "Apache-2.0"
 license-files = ["LICENSE" ]
 requires-python = ">=3.14"
 dependencies = [
  "mypy>=1.19.1",
+ "pymongo>=4.15.5",
  "pytest>=9.0.2",
+ "sqlalchemy>=2.0.45",
 ]
 authors = [
    { name = "Mark C. Chu-Carroll", email = "markcc@gmail.com"}
@@ -30,3 +32,7 @@ build-backend = "uv_build"
 [pycodestyle]
 max-line-length = 100
 
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]

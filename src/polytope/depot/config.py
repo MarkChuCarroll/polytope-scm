@@ -1,9 +1,23 @@
 
-from typing import NamedTuple
+from typing import NamedTuple, TypedDict
 
-class Config(NamedTuple):
+
+class MongoConfig(TypedDict):
+    connection_str: str
+    db_name: str
+
+
+class FileStorageConfig(TypedDict):
+    storage_path: str
+
+
+class UserConfig(TypedDict):
     root_user: str
     root_email: str
     password: str
-    db_dir: str
 
+
+class Config(TypedDict):
+    user: UserConfig
+    storage: FileStorageConfig
+    db: MongoConfig

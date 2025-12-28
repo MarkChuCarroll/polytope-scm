@@ -14,39 +14,35 @@
 
 import copy
 from datetime import datetime
-import os
-import shelve
-from typing import List
+import json
+from pymongo.synchronous.cursor import Cursor
+
+from typing import List, Tuple
 from polytope.common.error import ErrorKind, PtException
-from polytope.common.stashable.action import Action
 from polytope.common.stashable.artifact import ArtifactVersion
 from polytope.common.stashable.change import Change
 from polytope.common.stashable.history import History, HistoryStep
 from polytope.common.stashable.ids import Id, IdKind
 from polytope.common.stashable.pvs import PVSKind, ProjectVersionSpecifier
-from polytope.common.stashable.user import AuthenticatedUser
+from polytope.common.stashable.stashable import JDict
+from polytope.common.stashable.user import Action, AuthenticatedUser
 from polytope.depot.config import Config
 from polytope.depot.depot import Depot
 from polytope.depot.stashes.stash import Stash
 from polytope.depot.stashes.user_stash import UserStash
 
-
-HISTORY = "history"
-STEP = "step"
 INITIAL_HISTORY_NAME = "main"
 
-# TODO: histories are always accessed by name, so we should
-# remove the ID type.
+
 class HistoryStash(Stash):
-    """
-    Schema:
-        shelf[HISTORY][project: str][name: str]: History
-        shelf[STEP][project: str][name: str][history: str][id: Id[HistoryStep]]: HistoryStep
-    """
-    def __init__(self, db_dir: str, depot: Depot) -> None:
-        self.db_dir = db_dir
-        self.db_path = os.path.join(db_dir, "history.db")
+
+    def __init__(self, depot: Depot) -> None:
         self.depot = depot
+        self.histories = self.depot.db.get_collection("histories")
+        self.steps = self.depot.db.get_collection("steps")
+
+    def init_storage(self, config):
+        pass
 
     @property
     def user_stash(self) -> UserStash:
@@ -69,13 +65,13 @@ class HistoryStash(Stash):
         Returns the history
         """
         self.user_stash.validate_permissions(auth, Action.read_project(project))
-        with shelve.open(self.db_path) as shelf:
-            if shelf[HISTORY].get(project) is None or shelf[HISTORY][project].get(history) is None:
-                raise PtException(ErrorKind.NotFound,
-                    f"History {history} not found in project {project}"
-                )
-            return shelf[HISTORY][project][history]
+        h_dict = self.histories.find_one({"project": project, "name": history})
 
+        if h_dict is None:
+            raise PtException(ErrorKind.NotFound,
+                              f"History {history} not found in project {project}")
+
+        return History.from_dict(h_dict)
 
     def retrieve_history_step(
         self,
@@ -101,13 +97,13 @@ class HistoryStash(Stash):
             step = len(history.steps) - 1
         else:
             step = number
-
         if step < len(history.steps):
-            with shelve.open(self.db_path) as shelf:
-                return shelf[STEP][history.steps[step]]
-        else:
-            raise PtException(ErrorKind.NotFound,
-                f"History step {history_name}@{number} not found")
+            s_dict = self.steps.find_one({"_id": str(history.steps[step])})
+            if s_dict is not None:
+
+                return HistoryStep.from_dict(s_dict)
+        raise PtException(ErrorKind.NotFound,
+                          f"History step {history_name}@{number} not found")
 
     def currentStep(
         self,
@@ -153,7 +149,6 @@ class HistoryStash(Stash):
         else:
             return hist.steps
 
-
     def create_history(
         self,
         auth: AuthenticatedUser,
@@ -178,15 +173,15 @@ class HistoryStash(Stash):
         Return the new history
         """
         self.user_stash.validate_permissions(auth, Action.write_project(project))
-        if self.history_exists_in_project(project, name):
+        if name in self.list_histories(auth, project):
             raise PtException(ErrorKind.Conflict,
-                f"Project {project} already has a history named {name}")
+                              f"Project {project} already has a history named {name}")
         baseStep = self.retrieve_history_step(auth, project, from_history, at_step)
-        historyFirstStep = copy.replace(baseStep,
-            id = Id.new_id( IdKind.ID_HISTORY_STEP),
-            history_name = name,
-            number = 0,
-            description = "branch into new history")
+        history_first_step = copy.replace(baseStep,
+                                          id=Id.new_id(IdKind.ID_HISTORY_STEP),
+                                          history_name=name,
+                                          idx=0,
+                                          description="branch into new history")
         history = History(
             project=project,
             name=name,
@@ -194,28 +189,11 @@ class HistoryStash(Stash):
             timestamp=datetime.now(),
             basis=ProjectVersionSpecifier(PVSKind.History, project, from_history,
                                           idx=at_step),
-            steps = [historyFirstStep.id])
-
-        with shelve.open(self.db_path) as shelf:
-            shelf[HISTORY][project][name] = history
-            shelf[STEP][project][historyFirstStep.id] = historyFirstStep
+            steps=[history_first_step.id])
+        self.histories.insert_one(history.to_dict())
+        self.steps.insert_one(history_first_step.to_dict())
+        self.depot.project_stash.add_history_to_project(auth, project, history.name)
         return history
-
-
-    def history_exists_in_project(self, project: str, name: str) -> bool:
-        """
-        Check if a history exists in a project
-
-        Arguments:
-        project -- the name of the project containing the history.
-        name -- the name of the history.
-
-        Returns true if a history with the name already exists in the project.
-        """
-        with shelve.open(self.db_path) as shelf:
-            return name in shelf[HISTORY][project]
-
-
 
     def add_history_step(
         self,
@@ -239,28 +217,31 @@ class HistoryStash(Stash):
         """
         self.user_stash.validate_permissions(auth, Action.write_project(project))
         hist = self.retrieve_history(auth, project, history)
-        newStep = HistoryStep(
-            id = Id.new_id(IdKind.ID_HISTORY_STEP),
-            project = project,
-            history_name = history,
-            idx = len(hist.steps),
-            baseline_id = baseline_version.artifact_id,
-            baseline_version_id = baseline_version.id,
-            change = change,
-            description = description
+        new_step = HistoryStep(
+            id=Id.new_id(IdKind.ID_HISTORY_STEP),
+            project=project,
+            history_name=history,
+            idx=len(hist.steps),
+            baseline_id=baseline_version.artifact_id,
+            baseline_version_id=baseline_version.id,
+            change=change,
+            description=description
         )
-        hist.steps.append(newStep.id)
-        with shelve.open(self.db_path) as shelf:
-            shelf[HISTORY][project][history] = hist
-            shelf[STEP][project][newStep.id] = newStep
-        return newStep
-
+        self.steps.insert_one(new_step.to_dict())
+        update = self.histories.update_one({"project": project, "name": history},
+                                           {"$push": {
+                                               "steps": str(new_step.id)
+                                           }})
+        if update.modified_count != 1:
+            raise PtException(ErrorKind.NotFound,
+                              f"Failed to update steps, because history {history} was not found")
+        return new_step
 
     def list_histories(
         self,
         auth: AuthenticatedUser,
         project: str
-    ) -> List[str]:
+    ) -> List[Tuple[str, str]]:
         """
         List the histories of a project
 
@@ -270,9 +251,14 @@ class HistoryStash(Stash):
 
         Returns the list of histories
         """
-        with shelve.open(self.db_path) as shelf:
-            return list(shelf[HISTORY][project].keys())
-
+        histories: Cursor[JDict] | None = self.histories.find({"project": project})
+        if histories is None:
+            raise PtException(ErrorKind.NotFound,
+                              f"No histories found for project {project}")
+        result: List[Tuple[str, str]] = []
+        for h in histories:
+            result.append((h["name"], h["description"]))
+        return result
 
     def create_initial_history(
         self,
@@ -298,30 +284,20 @@ class HistoryStash(Stash):
             datetime.now(),
             ProjectVersionSpecifier(PVSKind.Baseline, project, INITIAL_HISTORY_NAME,
                                     baseline=baseline_version.id),
-            steps = [])
+            steps=[])
 
         step = HistoryStep(
-            id = Id.new_id(IdKind.ID_HISTORY_STEP),
-            project = project,
-            history_name = INITIAL_HISTORY_NAME,
-            idx = 0,
-            baseline_id = baseline_version.artifact_id,
-            baseline_version_id = baseline_version.id,
-            change = None,
-            description = "initial project version")
+            id=Id.new_id(IdKind.ID_HISTORY_STEP),
+            project=project,
+            history_name=INITIAL_HISTORY_NAME,
+            idx=0,
+            baseline_id=baseline_version.artifact_id,
+            baseline_version_id=baseline_version.id,
+            change=None,
+            description="initial project version")
 
         history.steps.append(step.id)
-        with shelve.open(self.db_path) as shelf:
-            shelf[HISTORY][project] = {}
-            shelf[HISTORY][project][history.name] = history
-            shelf[STEP][project] = {}
-            shelf[STEP][project][step.id] = step
+        self.histories.insert_one(history.to_dict())
+        print(f"Writing step {step.id} to mongo")
+        self.steps.insert_one(step.to_dict())
         return history
-
-    def init_storage(self, config: Config) -> None:
-        with shelve.open(self.db_path) as shelf:
-            if shelf.get(HISTORY) is None:
-                shelf[HISTORY] = {}
-            if shelf.get(STEP) is None:
-                shelf[STEP] = {}
-

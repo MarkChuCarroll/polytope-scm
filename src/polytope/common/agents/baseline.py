@@ -95,17 +95,10 @@ class BaselineConflict(NamedTuple):
 
 class BaselineAgent(Agent[Baseline]):
 
-    @property
     def artifact_type(self) -> str:
         return "baseline"
 
     instance: "BaselineAgent | None" = None
-
-    @classmethod
-    def get(cls) -> "BaselineAgent":
-        if cls.instance is None:
-            cls.instance = BaselineAgent()
-        return cls.instance
 
     def decode_from_bytes(self, content: bytes) -> Baseline:
         return Baseline.from_dict(json.loads(content))
@@ -119,9 +112,12 @@ class BaselineAgent(Agent[Baseline]):
         source: ArtifactVersion,
         target: ArtifactVersion,
     ) -> MergeResult:
-        ancestor_baseline: Baseline = self.decode_from_bytes(ancestor.content)
-        source_baseline: Baseline = self.decode_from_bytes(source.content)
-        target_baseline: Baseline = self.decode_from_bytes(target.content)
+        anc_content = self.storage.get(ancestor.content_id)
+        src_content = self.storage.get(source.content_id)
+        tgt_content = self.storage.get(target.content_id)
+        ancestor_baseline: Baseline = self.decode_from_bytes(anc_content)
+        source_baseline: Baseline = self.decode_from_bytes(src_content)
+        target_baseline: Baseline = self.decode_from_bytes(tgt_content)
 
         target_version_map = target_baseline.entries
         targetArtifacts = set(target_version_map.keys())
@@ -168,7 +164,7 @@ class BaselineAgent(Agent[Baseline]):
                         MergeConflict(
                             id=Id.new_id(IdKind.ID_CONFLICT),
                             artifact_id=ancestor.artifact_id,
-                            artifact_type=self.artifact_type,
+                            artifact_type=self.artifact_type(),
                             source_version=source.id,
                             target_version=target.id,
                             details=BaselineConflict.encode_to_bytes(
@@ -189,7 +185,7 @@ class BaselineAgent(Agent[Baseline]):
                         MergeConflict(
                             id=Id.new_id(IdKind.ID_CONFLICT),
                             artifact_id=ancestor.artifact_id,
-                            artifact_type=self.artifact_type,
+                            artifact_type=self.artifact_type(),
                             source_version=source.id,
                             target_version=target.id,
                             details=BaselineConflict.encode_to_bytes(
@@ -226,7 +222,7 @@ class BaselineAgent(Agent[Baseline]):
                     MergeConflict(
                         id=Id.new_id(IdKind.ID_CONFLICT),
                         artifact_id=ancestor.artifact_id,
-                        artifact_type=self.artifact_type,
+                        artifact_type=self.artifact_type(),
                         source_version=source.id,
                         target_version=target.id,
                         details=BaselineConflict.encode_to_bytes(
@@ -240,7 +236,7 @@ class BaselineAgent(Agent[Baseline]):
                     )
                 )
         return MergeResult(
-            artifact_type=self.artifact_type,
+            artifact_type=self.artifact_type(),
             artifact_id=ancestor.artifact_id,
             ancestor_version=ancestor.id,
             source_version=source.id,

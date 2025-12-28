@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import abstractmethod
+
+from abc import abstractmethod, ABC
 import hashlib
 import textwrap
 from typing import List, NamedTuple, Protocol, Tuple
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion
 from polytope.common.stashable.ids import Id
+from polytope.depot.depot import Depot
+from polytope.depot.storage.storage import Storage
+
 
 class MergeConflict(NamedTuple):
     id: Id["MergeConflict"]
@@ -35,6 +39,7 @@ class MergeConflict(NamedTuple):
             Target version: {self.target_version}
             """)
 
+
 class MergeResult(NamedTuple):
     artifact_type: str
     artifact_id: Id[Artifact]
@@ -45,11 +50,17 @@ class MergeResult(NamedTuple):
     conflicts: List[MergeConflict]
 
 
-class Agent[T](Protocol):
-    @property
+class Agent[T](ABC):
+    def __init__(self, storage: Storage) -> None:
+        self.storage = storage
+
+    @abstractmethod
     def artifact_type(self) -> str: ...
 
+    @abstractmethod
     def encode_to_bytes(self, content: T) -> bytes: ...
+
+    @abstractmethod
     def decode_from_bytes(self, content: bytes) -> T: ...
 
     def content_hash(self, content: T) -> str:
@@ -58,6 +69,7 @@ class Agent[T](Protocol):
         sha.update(s)
         return sha.hexdigest()
 
+    @abstractmethod
     def merge(
         self,
         ancestor: ArtifactVersion,
@@ -66,8 +78,10 @@ class Agent[T](Protocol):
     ) -> MergeResult: ...
 
 
-
 class FileAgent[T](Agent[T]):
+    def __init(self, storage: Storage) -> None:
+        super().__init__(storage)
+
     # Given a reference to a file, return "true" if the file is a type that
     # can be processed by the agent.
     @abstractmethod
@@ -82,4 +96,3 @@ class FileAgent[T](Agent[T]):
     def bytes_to_disk(self, path: str, content: bytes) -> None:
         with open(path, "wb") as out:
             out.write(content)
-

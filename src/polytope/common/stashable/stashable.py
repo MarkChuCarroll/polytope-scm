@@ -1,8 +1,9 @@
 
-from typing import Any, Dict, Protocol
+from typing import Any, Dict, Protocol, TypeAlias
 
 
-JDict = Dict[str, Any]
+JSON: TypeAlias = dict[str, "JSON"] | list["JSON"] | str | int | float | bool | None
+JDict: TypeAlias = dict[str, Any]
 
 
 class Stashable(Protocol):
@@ -23,8 +24,8 @@ class Stashable(Protocol):
     you can't have mixins added to a NamedTuple. But it's still useful
     to have for documentation, I guess?
     """
+
     def to_dict(self) -> JDict: ...
 
     @classmethod
     def from_dict(self, dict: JDict) -> "Stashable": ...
-

@@ -29,16 +29,18 @@ from polytope.common.util.filetype import FileType
 from polytope.common.agents.agents import FileAgent, MergeConflict, MergeResult
 from typing import Any, Dict, List, NamedTuple
 
+from polytope.depot.depot import Depot
+from polytope.depot.storage.storage import Storage
+
 
 class TextContent:
     """
     The representation of the content of text artifacts in Polytope.
     """
-    content: List[str]
+    lines: List[str]
 
     def __init__(self, lines: List[str]) -> None:
-            self.content = lines
-
+        self.lines = lines
 
 
 class TextMergeConflict(NamedTuple):
@@ -66,68 +68,60 @@ class TextAgent(FileAgent[TextContent]):
     In practice, this seems to avoid conflicts and generate good results in many places
     that would have been conflicts in the traditional diff-transform approach.
     """
-    def __init__(self):
-        super().__init__(self)
+
+    def __init__(self, storage: Storage):
+        super().__init__(storage)
         # A set of file extensions that this agent can handle.
         self.extensions = set([".txt", ".java", ".kt", ".js", ".ts", ".json",
-                    ".rs", ".py", ".rb", ".ltx", ".tex", ".md", ".yaml", ".c", ".cc", "h", ".cpp"])
-
-    it: TextAgent | None = None
-
-    @classmethod
-    def get(cls) -> "TextAgent":
-        if cls.it is None:
-            cls.it = TextAgent()
-        return cls.it
-
+                               ".rs", ".py", ".rb", ".ltx", ".tex", ".md",
+                               ".yaml", ".c", ".cc", "h", ".cpp"])
 
     def can_handle(self, path: str) -> bool:
         (_, ext) = os.path.splitext(path)
         return ext in self.extensions or filetype.of(path) == FileType.text
-
 
     def read_from_disk(self, path: str) -> TextContent:
         with open(path, "r", encoding="utf-8") as inp:
             text = inp.readlines()
             return TextContent(text)
 
-
-
     def write_to_disk(self, path: str, value: TextContent) -> None:
         with open(path, "w") as out:
-            out.writelines(value.content)
+            out.writelines(value.lines)
 
-    @property
     def artifact_type(self) -> str:
         return "text"
 
-
      # Convert a text content to an array of bytes.
+
     def encode_to_bytes(self, content: TextContent) -> bytes:
-        return "".join(content.content).encode()
+        return "".join(content.lines).encode()
 
     def decode_from_bytes(self, content: bytes) -> TextContent:
         inp = BytesIO(content)
         return TextContent([l.decode() for l in inp.readlines()])
 
     def merge(self,
-        ancestor: ArtifactVersion,
-        source: ArtifactVersion,
-        target: ArtifactVersion
-    )-> MergeResult:
+              ancestor: ArtifactVersion,
+              source: ArtifactVersion,
+              target: ArtifactVersion
+              ) -> MergeResult:
+        anc_content = self.storage.get(ancestor.content_id)
+        src_content = self.storage.get(source.content_id)
+        tgt_content = self.storage.get(target.content_id)
         return self.do_merge(
             ancestor.artifact_id,
             ancestor.id,
             source.id,
             target.id,
-            self.decode_from_bytes(ancestor.content),
-            self.decode_from_bytes(source.content),
-            self.decode_from_bytes(target.content)
+            self.decode_from_bytes(anc_content),
+            self.decode_from_bytes(src_content),
+            self.decode_from_bytes(tgt_content)
         )
 
     def coalesce_lines_to_blocks(self,
-        src_labeled_lines: List[LabeledLine],
-        tgt_labeled_lines: List[LabeledLine]) -> List[MergeBlock]:
+                                 src_labeled_lines: List[LabeledLine],
+                                 tgt_labeled_lines: List[LabeledLine]) -> List[MergeBlock]:
 
         # A map from a line number in the base to a collection of lines that occur
         # before that line number in one of the mods. The anchor line of a block
@@ -203,12 +197,13 @@ class TextAgent(FileAgent[TextContent]):
 
         # Anything left over in base is a deleted line;
         for baseline in range(first_unprocessed_in_base, len(base)):
-            result.append(LabeledLine(LineLabel.Deleted, base[baseline], baseline, None, baseline + 1))
+            result.append(LabeledLine(LineLabel.Deleted,
+                          base[baseline], baseline, None, baseline + 1))
         # anything left over in the mod is an insert.
         for tgtline in range(first_unprocessed_in_target, len(modified)):
-            result.append(LabeledLine(LineLabel.Inserted, modified[tgtline], None, tgtline, tgtline + 1))
+            result.append(LabeledLine(LineLabel.Inserted,
+                          modified[tgtline], None, tgtline, tgtline + 1))
         return result
-
 
     def do_merge(
         self,
@@ -219,39 +214,41 @@ class TextAgent(FileAgent[TextContent]):
         base: TextContent,
         merge_src: TextContent,
         merge_tgt: TextContent
-    )-> MergeResult:
-        lab_src: List[LabeledLine] = self.create_labeled_list(base.content, merge_src.content)
-        lab_tgt: List[LabeledLine] = self.create_labeled_list(base.content, merge_tgt.content)
+    ) -> MergeResult:
+        lab_src: List[LabeledLine] = self.create_labeled_list(base.lines, merge_src.lines)
+        lab_tgt: List[LabeledLine] = self.create_labeled_list(base.lines, merge_tgt.lines)
         blocks: List[MergeBlock] = self.coalesce_lines_to_blocks(lab_src, lab_tgt)
 
         result: List[str] = []
         all_conflicts: List[MergeConflict] = []
         for block in blocks:
             block.render(
-                source_label = "merge source ($sourceVersionId)",
-                target_label = "merge target $(targetVersionId)",
-                artifact_id = artifact_id,
+                source_label="merge source ($sourceVersionId)",
+                target_label="merge target $(targetVersionId)",
+                artifact_id=artifact_id,
                 source_version_id=source_version_id,
                 target_version_id=target_version_id,
-                result = result
+                result=result
             )
 
         return MergeResult(
-            artifact_type = self.artifact_type,
-            artifact_id = artifact_id,
-            ancestor_version = ancestor_version_id,
-            source_version = source_version_id,
-            target_version = target_version_id,
-            proposed_merge = self.encode_to_bytes(TextContent(result)),
-            conflicts = all_conflicts)
+            artifact_type=self.artifact_type(),
+            artifact_id=artifact_id,
+            ancestor_version=ancestor_version_id,
+            source_version=source_version_id,
+            target_version=target_version_id,
+            proposed_merge=self.encode_to_bytes(TextContent(result)),
+            conflicts=all_conflicts)
+
 
 class LineLabel(Enum):
     Deleted = "d"
     Inserted = "i"
     Unmodified = "u"
 
-
  # Lines labelled with information about how they differ from a base version.
+
+
 class LabeledLine(NamedTuple):
     label: LineLabel
     content: str
@@ -268,28 +265,29 @@ class LabeledLine(NamedTuple):
             "anchor_line": self.anchor_line
         }
 
-
     def __repr__(self) -> str:
         return f"LabeledLine({self.label}, {self.content}, {self.base_line}, {self.target_line}, {self.anchor_line})"
-
 
  # Check if two labeled lines match.
  # Matching means that the two correspond to an equivalent edit:
  # * deleting the same line;
  # * inserting the same text in the same position;
  # * leaving the same text unmodified.
+
+
 def lines_match(first: LabeledLine, second: LabeledLine) -> bool:
     return (second.label == first.label and
             second.base_line == first.base_line and
             second.anchor_line == first.anchor_line and
             second.content == first.content)
 
-
  # A representation of a block of modified text from two different edits.
  # A block is anchored by a line of text from the original document which comes before
  # the edits. (This has the somewhat confusing effect that a file with 10 lines will have 11
  # indices - index[10] means "before the invisible line at the end of the file")
- #/
+ # /
+
+
 class MergeBlock:
     anchor_line: int
     src_lines: List[LabeledLine]
@@ -320,7 +318,7 @@ class MergeBlock:
      # Checks if the two branches of a merge block correspond to the same edit.
     def matches(self) -> bool:
         return (len(self.src_lines) == len(self.tgt_lines) and
-                all([lines_match(a,b) for (a,b) in zip(self.src_lines, self.tgt_lines)]))
+                all([lines_match(a, b) for (a, b) in zip(self.src_lines, self.tgt_lines)]))
 
      # Generate the merge result of the labeled lines anchored at this point.
     def render(
@@ -337,8 +335,8 @@ class MergeBlock:
             # If the two blocks match - that is, they generate to the same edit -
             # then we just return either one of them.
             for l in self.src_lines:
-               if l.label == LineLabel.Inserted or l.label == LineLabel.Unmodified:
-                  result.append(l.content)
+                if l.label == LineLabel.Inserted or l.label == LineLabel.Unmodified:
+                    result.append(l.content)
         elif all([l.label == LineLabel.Unmodified for l in self.tgt_lines]):
             # If all the target lines are unmodified, then the merge result is
             # the lines from the merge source.
@@ -366,11 +364,11 @@ class MergeBlock:
                 conflict_block_end = len(result)
                 conflicts.append(
                     MergeConflict(
-                        id = Id.new_id(IdKind.ID_CONFLICT),
-                        artifact_id = artifact_id,
-                        artifact_type = TextAgent.get().artifact_type,
-                        source_version = source_version_id,
-                        target_version = target_version_id,
-                        details = base64.b64encode(pickle.dumps(json.dumps(TextMergeConflict(conflict_block_start, conflict_block_end))))))
+                        id=Id.new_id(IdKind.ID_CONFLICT),
+                        artifact_id=artifact_id,
+                        artifact_type="text",
+                        source_version=source_version_id,
+                        target_version=target_version_id,
+                        details=base64.b64encode(pickle.dumps(json.dumps(TextMergeConflict(conflict_block_start, conflict_block_end))))))
 
         return conflicts

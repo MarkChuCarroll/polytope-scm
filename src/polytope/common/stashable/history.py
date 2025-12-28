@@ -61,6 +61,7 @@ class History(NamedTuple):
             Contains {len(self.steps)} steps
             """)
 
+
 class HistoryStep(NamedTuple):
     id: Id["HistoryStep"]
     project: str
@@ -72,10 +73,14 @@ class HistoryStep(NamedTuple):
     description: str
 
     def to_dict(self) -> JDict:
+        if self.change is None:
+            change = None
+        else:
+            change = str(self.change)
         return {
-            "id": str(self.id),
+            "_id": str(self.id),
             "project": self.project,
-            "change": self.change is None if None else str(self.change),
+            "change": change,
             "history_name": self.history_name,
             "idx": self.idx,
             "baseline_id": str(self.baseline_id),
@@ -86,16 +91,15 @@ class HistoryStep(NamedTuple):
     @classmethod
     def from_dict(cls, dict: JDict) -> "HistoryStep":
         return HistoryStep(
-            id=Id.from_string(dict["id"]),
+            id=Id.from_string(dict["_id"]),
             project=dict["project"],
-            change= dict["change"] is None if None else Id.from_string(dict["change"]),
+            change=None if dict["change"] is None else Id.from_string(dict["change"]),
             history_name=dict["history_name"],
-            idx = dict["idx"],
+            idx=dict["idx"],
             baseline_id=Id.from_string(dict["baseline_id"]),
             baseline_version_id=Id.from_string(dict["baseline_version_id"]),
             description=dict["description"]
         )
-
 
     def __repr__(self) -> str:
         return textwrap.dedent(f"""\

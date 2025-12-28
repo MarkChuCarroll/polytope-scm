@@ -43,14 +43,14 @@ class Change(NamedTuple):
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "id": str(self.id),
+            "_id": str(self.id),
             "project": self.project,
             "name": self.name,
             "description": self.description,
             "baseline": str(self.baseline),
             "history": self.history,
             "basis": self.basis.to_dict(),
-            "save_points": [ str(sp) for sp in self.save_points ],
+            "save_points": [str(sp) for sp in self.save_points],
             "status": self.status.value,
             "timestamp": self.timestamp
         }
@@ -58,16 +58,16 @@ class Change(NamedTuple):
     @classmethod
     def from_dict(cls, dict: Dict[str, Any]) -> "Change":
         return Change(
-            id=Id.from_string(dict["id"]),
-            project = dict["project"],
-            name = dict["name"],
-            description = dict["description"],
-            baseline = Id.from_string(dict["baseline"]),
-            timestamp = dict["timestamp"],
-            history = dict["history"],
-            basis = ProjectVersionSpecifier.from_dict(dict["basis"]),
-            save_points = [ Id.from_string(sp) for sp in dict["save_points"]],
-            status = ChangeStatus[dict["status"]])
+            id=Id.from_string(dict["_id"]),
+            project=dict["project"],
+            name=dict["name"],
+            description=dict["description"],
+            baseline=Id.from_string(dict["baseline"]),
+            timestamp=dict["timestamp"],
+            history=dict["history"],
+            basis=ProjectVersionSpecifier.from_dict(dict["basis"]),
+            save_points=[Id.from_string(sp) for sp in dict["save_points"]],
+            status=ChangeStatus(dict["status"]))
 
     def __repr__(self) -> str:
         ts = str(self.timestamp)
@@ -97,7 +97,7 @@ class SavePoint(NamedTuple):
             "description": self.description,
             "basis": self.basis.to_dict(),
             "baseline_version": str(self.baseline_version),
-            "modified_artifacts": [ str(aid) for aid in self.modified_artifacts],
+            "modified_artifacts": [str(aid) for aid in self.modified_artifacts],
             "timestamp": self.timestamp
         }
 
@@ -113,7 +113,6 @@ class SavePoint(NamedTuple):
             modified_artifacts=[Id.from_string(ma) for ma in dict["modified_artifacts"]],
             timestamp=dict["timestamp"]
         )
-
 
     def __repr__(self) -> str:
         mods = ", ".join([str(s) for s in self.modified_artifacts])

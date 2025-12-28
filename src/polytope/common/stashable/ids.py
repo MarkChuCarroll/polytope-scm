@@ -23,6 +23,8 @@ class IdKind(Enum):
     ID_CHANGE = "chg"
     ID_CHANGE_SAVE = "save"
     ID_CONFLICT = "conflict"
+    ID_CONTENT = "content"
+    ID_TRANSIENT = "transint"
     ID_ARTIFACT = "art"
     ID_VERSION = "ver"
     ID_HISTORY = "ver"

@@ -22,21 +22,23 @@ from polytope.common.stashable.artifact import Artifact, ArtifactVersion
 from polytope.common.stashable.ids import Id
 from polytope.common.stashable.pvs import ProjectVersionSpecifier
 
+
 class WorkspaceDescriptor(NamedTuple):
     wsName: str
     project: str
     creator: str
     description: str
     createdAt: datetime
-    lastModified: datetime
+    last_modified: datetime
 
     def __repr__(self) -> str:
         return textwrap.dedent(f"""\
             Workspace: {self.project}::{self.wsName}
             Created at: {self.createdAt} by: {self.creator}
             Description: {self.description}
-            ModifiedAt: {self.modified}
+            ModifiedAt: {self.last_modified}
             """)
+
 
 class Workspace(NamedTuple):
     id: Id["Workspace"]
@@ -54,7 +56,6 @@ class Workspace(NamedTuple):
     workingVersions: Dict[Id[Artifact], Id[ArtifactVersion]]
     modifiedArtifacts: Set[Id[Artifact]] = set()
     conflicts: List[MergeConflict] = []
-
 
     # fun render(): str {
     #     created = toLocalDateTime(createdAt)

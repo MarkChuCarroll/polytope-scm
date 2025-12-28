@@ -16,9 +16,10 @@
 # The record for an artifact in the depot
 from datetime import datetime
 from enum import Enum
-from typing import Any, NamedTuple, List, Dict
+from typing import Any, NamedTuple, List, Dict, TypedDict
 from polytope.common.stashable.ids import Id
 from polytope.common.stashable.stashable import JDict, Stashable
+from polytope.depot.storage.storage import Content
 
 
 class Artifact(NamedTuple):
@@ -30,28 +31,28 @@ class Artifact(NamedTuple):
     metadata: Dict[str, str]
     versions: List[Id["ArtifactVersion"]]
 
+    @classmethod
+    def from_dict(cls, d: JDict) -> "Artifact":
+        return Artifact(
+            id=Id.from_string(d["_id"]),
+            artifact_type=d["artifact_type"],
+            timestamp=datetime.fromisoformat(d["timestamp"]),
+            creator=d["creator"],
+            project=d["project"],
+            metadata=d["metadata"],
+            versions=list(Id.from_string(v) for v in d["versions"])
+        )
+
     def to_dict(self) -> JDict:
         return {
-            "id": self.id,
+            "_id": str(self.id),
             "artifact_type": self.artifact_type,
-            "timestamp": self.timestamp,
+            "timestamp": self.timestamp.isoformat(),
             "creator": self.creator,
             "project": self.project,
             "metadata": self.metadata,
-            "versions": [ str(i) for i in self.versions ]
+            "versions": [str(v) for v in self.versions]
         }
-
-    @classmethod
-    def from_dict(self, dict: JDict) -> "Artifact":
-        return Artifact(
-            id=Id.from_string(dict["id"]),
-            artifact_type=dict["artifact_type"],
-            timestamp=dict["timestamp"],
-            creator=dict["creator"],
-            project=dict["project"],
-            metadata=dict["metadata"],
-            versions=[Id.from_string(i) for i in dict["versions"]]
-        )
 
 
 class VersionStatus(Enum):
@@ -66,34 +67,34 @@ class ArtifactVersion(NamedTuple):
     artifact_type: str
     timestamp: datetime
     creator: str
-    content: bytes
+    content_id: Id[Content]
     parents: List[Id["ArtifactVersion"]]
     metadata: Dict[str, str]
     status: VersionStatus
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> JDict:
         return {
-            "id": str(self.id),
+            "_id": str(self.id),
             "artifact_id": str(self.artifact_id),
             "artifact_type": self.artifact_type,
-            "timestamp": self.timestamp,
+            "timestamp": self.timestamp.isoformat(),
             "creator": self.creator,
-            "content": self.content,
-            "parents": [str(p) for p in self.parents],
+            "content_id": str(self.content_id),
+            "parents": list(str(p) for p in self.parents),
             "metadata": self.metadata,
             "status": self.status.value
         }
 
     @classmethod
-    def from_dict(cls, dict: Dict[str, Any]) -> "ArtifactVersion":
+    def from_dict(cls, d: JDict) -> "ArtifactVersion":
         return ArtifactVersion(
-            id=Id.from_string(dict["id"]),
-            artifact_id=Id.from_string(dict["artifact_id"]),
-            artifact_type=dict["artifact_type"],
-            timestamp=dict["timestamp"],
-            creator=dict["creator"],
-            content=dict["content"],
-            parents=[Id.from_string(p) for p in dict["parents"]],
-            metadata=dict["metadata"],
-            status=VersionStatus[dict["status"]]
+            id=Id.from_string(d["_id"]),
+            artifact_id=Id.from_string(d["artifact_id"]),
+            artifact_type=d["artifact_type"],
+            timestamp=datetime.fromisoformat(d["timestamp"]),
+            creator=d["creator"],
+            content_id=Id.from_string(d["content_id"]),
+            parents=list(Id.from_string(i) for i in d["parents"]),
+            metadata=d["metadata"],
+            status=VersionStatus(d["status"])
         )

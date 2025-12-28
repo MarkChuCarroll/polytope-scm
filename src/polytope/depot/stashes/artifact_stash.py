@@ -12,48 +12,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
+import json
 from datetime import datetime
-import os
-import shelve
-from typing import Dict, List, Set, Tuple
+from sqlite3.dbapi2 import Timestamp
+from typing import Any, Dict, List, Set, Tuple, assert_type
 
 from polytope.common.error import ErrorKind, PtException
-from polytope.common.stashable.action import Action
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion, VersionStatus
 from polytope.common.stashable.ids import Id, IdKind
-from polytope.common.stashable.user import AuthenticatedUser
+from polytope.common.stashable.user import Action, AuthenticatedUser
 from polytope.depot.config import Config
 from polytope.depot.depot import Depot
 from polytope.depot.stashes.stash import Stash
 from polytope.depot.stashes.user_stash import UserStash
+from polytope.depot.storage.storage import Content, Storage
 
-ARTIFACTS = "artifacts"
-VERSIONS = "versions"
 
 class ArtifactStash(Stash):
     """
     The stash that manages storage of artifacts and versions for the depot.
 
-    Schema:
-        shelf[ARTIFACTS][Id[Artifact]]: Artifact
-        shelf[VERSIONS][Id[ArtifactVersion]]: ArtifactVersion
     """
+
     def __init__(
-        self,
-        db_dir: str,
-        depot: Depot) -> None:
-        self.db_dir = db_dir
-        self.db_path = os.path.join(db_dir, "artifacts.db")
+            self,
+            depot: Depot) -> None:
         self.depot = depot
+        self.artifacts = self.depot.db.get_collection("artifacts")
+        self.versions = self.depot.db.get_collection("versions")
+        self.storage = self.depot.storage
+
+    def init_storage(self, config):
+        pass
 
     @property
     def user_stash(self) -> UserStash:
         return self.depot.user_stash
 
-
-    def retrieve_artifact(self, auth: AuthenticatedUser,
-                          project: str, id: Id[Artifact])-> Artifact:
+    def retrieve_artifact(self, auth:
+                          AuthenticatedUser,
+                          project: str, id: Id[Artifact]) -> Artifact:
         """
         Retrieves an artifact from the database
 
@@ -65,16 +63,15 @@ class ArtifactStash(Stash):
         returns  the full Artifact record.
         """
         self.user_stash.validate_permissions(auth, Action.read_project(project))
-        with shelve.open(self.db_path) as shelf:
-            art = Artifact.from_dict(shelf[ARTIFACTS][project].get(id))
-            if art is None:
-                raise PtException(ErrorKind.NotFound, f"Artifact {id} not found")
-            return art
-
+        art_dict = self.artifacts.find_one({"_id": str(id), "project": project})
+        if art_dict is None:
+            raise PtException(ErrorKind.NotFound, f"Artifact {id} not found")
+        return Artifact.from_dict(art_dict)
 
     def retrieve_version(
         self,
-        auth: AuthenticatedUser,
+        auth:
+        AuthenticatedUser,
         project: str,
         art_id: Id[Artifact],
         ver_id: Id[ArtifactVersion]
@@ -85,37 +82,38 @@ class ArtifactStash(Stash):
         Arguments:
         auth -- the authenticated user performing the operation.
         project -- the project containing the artifact.
-        artifact_id -- the artifact ID
-        version_id -- the version ID.
+        art_id -- the artifact ID
+        ver_id -- the version ID.
 
         Returns the full ArtifactVersion record.
         """
         self.user_stash.validate_permissions(auth, Action.read_project(project))
-        with shelve.open(self.db_path) as shelf:
-            verDict = shelf[VERSIONS][project].get("version_id")
-            if verDict is None:
-                raise PtException(ErrorKind.NotFound, f"Artifact Version {ver_id} not found")
-            ver = ArtifactVersion.from_dict(verDict)
-            if ver.artifact_id != art_id:
-                raise PtException(ErrorKind.NotFound, f"Artifact Version {ver_id} not found")
-            else:
-                return ver
+        ver_dict = self.versions.find_one({"_id": str(ver_id),
+                                           "artifact_id": str(art_id)})
+        if ver_dict is None:
+            raise PtException(ErrorKind.NotFound,
+                              f"Artifact Version {ver_id} not found")
+
+        return ArtifactVersion.from_dict(ver_dict)
 
     def create_artifact(self,
-        auth: AuthenticatedUser,
-        project: str,
-        art_type: str,
-        initial_content: bytes,
-        metadata: Dict[str, str]
-    ) -> Tuple[Artifact, ArtifactVersion]:
+                        auth:
+                            AuthenticatedUser,
+                        project: str,
+                        art_type:
+                            str,
+                        initial_content_id: Id[Content],
+                        metadata:
+                            Dict[str, str]
+                        ) -> Tuple[Artifact, ArtifactVersion]:
         """
         Store a new artifact from the database.
 
         Arguments:
         auth -- the authenticated user performing the operation
         project -- the project containing the artifact.
-        artifactType -- the type of the new artifact.
-        initialContent -- the content of the new artifact.
+        artifact_type -- the type of the new artifact.
+        initial_content_id -- the content of the new artifact.
         metadata -- metadata to apply to the new artifact.
 
         Throws PtException if the artifact already exists, if the user
@@ -126,33 +124,28 @@ class ArtifactStash(Stash):
         artId: Id[Artifact] = Id.new_id(IdKind.ID_ARTIFACT)
         now = datetime.now()
         initial_version = ArtifactVersion(
-            id = Id.new_id(IdKind.ID_VERSION),
+            id=Id.new_id(IdKind.ID_VERSION),
             artifact_id=artId,
             artifact_type=art_type,
             timestamp=now,
             creator=auth.user_id,
-            content=initial_content,
+            content_id=initial_content_id,
             parents=[],
             metadata=metadata,
             status=VersionStatus.Committed)
 
         artifact = Artifact(
-            id = artId,
-            artifact_type = art_type,
+            id=artId,
+            artifact_type=art_type,
             timestamp=now,
             creator=auth.user_id,
             project=project,
             metadata=metadata,
             versions=[initial_version.id]
         )
-        with shelve.open(self.db_path) as shelf:
-            if project not in shelf[ARTIFACTS]:
-                shelf[ARTIFACTS][project] = {}
-            if project not in shelf[VERSIONS]:
-                shelf[VERSIONS][project] = {}
-            shelf[ARTIFACTS][project][artId] = artifact.to_dict()
-            shelf[VERSIONS][project][initial_version.id] = initial_version.to_dict()
-            return (artifact, initial_version)
+        self.artifacts.insert_one(artifact.to_dict())
+        self.versions.insert_one(initial_version.to_dict())
+        return (artifact, initial_version)
 
     def create_version(
         self,
@@ -160,9 +153,9 @@ class ArtifactStash(Stash):
         project: str,
         art_id: Id[Artifact],
         art_type: str,
-        content: bytes,
+        content_id: Id[Content],
         parents: List[Id[ArtifactVersion]],
-        metadata: Dict[str, str]
+        metadata: Dict[str, str],
     ) -> ArtifactVersion:
         """
         Create a new version af an artifact
@@ -177,19 +170,25 @@ class ArtifactStash(Stash):
         """
         self.user_stash.validate_permissions(auth, Action.write_project(project))
         ver = ArtifactVersion(
-            id = Id.new_id(IdKind.ID_VERSION),
-            artifact_id = art_id,
-            creator = auth.user_id,
-            content = content,
-            timestamp = datetime.now(),
-            parents = parents,
-            metadata = metadata,
-            artifact_type = art_type,
-            status = VersionStatus.Committed
+            id=Id.new_id(IdKind.ID_VERSION),
+            artifact_id=art_id,
+            creator=auth.user_id,
+            content_id=content_id,
+            timestamp=datetime.now(),
+            parents=parents,
+            metadata=metadata,
+            artifact_type=art_type,
+            status=VersionStatus.Committed
         )
-        with shelve.open(self.db_path) as shelf:
-            shelf[VERSIONS][project][ver.id] = ver.to_dict()
-            return ver
+        versions = self.retrieve_artifact(auth, project, art_id).versions
+        versions.append(ver.id)
+        self.versions.insert_one(ver.to_dict())
+        self.artifacts.update_one({"_id": str(art_id)},
+                                  {"$set": {
+                                      "versions": [str(v) for v in versions]
+                                  }})
+
+        return ver
 
     def create_working_version(
         self,
@@ -212,21 +211,21 @@ class ArtifactStash(Stash):
         self.user_stash.validate_permissions(auth, Action.write_project(project))
         base = self.retrieve_version(auth, project, artifact_id, base_ver)
         working = ArtifactVersion(
-            id = Id.new_id(IdKind.ID_VERSION),
-            artifact_id = base.artifact_id,
-            artifact_type = base.artifact_type,
-            content = base.content,
-            creator = auth.user_id,
-            timestamp = datetime.now(),
-            metadata = base.metadata,
-            parents = [base.id],
-            status = VersionStatus.Working
+            id=Id.new_id(IdKind.ID_VERSION),
+            artifact_id=base.artifact_id,
+            artifact_type=base.artifact_type,
+            content_id=base.content_id,
+            creator=auth.user_id,
+            timestamp=datetime.now(),
+            metadata=base.metadata,
+            parents=[base.id],
+            status=VersionStatus.Working
         )
-        with shelve.open(self.db_path) as shelf:
-            art: Artifact = Artifact.from_dict(shelf[ARTIFACTS][project][artifact_id])
-            shelf[VERSIONS][project][working.id] = working.to_dict()
-            art.versions.append(working.id)
-            shelf[ARTIFACTS][project][artifact_id] = art.to_dict()
+        self.versions.insert_one(working)
+        self.artifacts.update_one({"_id": str(artifact_id)}, {
+            "$push": {
+                "versions": str(working.id)
+            }})
         return working
 
     def update_working_version(
@@ -235,7 +234,7 @@ class ArtifactStash(Stash):
         project: str,
         artifact_id: Id[Artifact],
         version_id: Id[ArtifactVersion],
-        updated_content: bytes | None,
+        updated_content_id: Id[Content] | None,
         updated_metadata: Dict[str, str] | None,
         updated_parents: List[Id[ArtifactVersion]] | None
     ) -> ArtifactVersion:
@@ -247,7 +246,7 @@ class ArtifactStash(Stash):
         project -- the project containing the artifact
         artifact_id -- the artifact ID
         version_id -- the version ID
-        updated_content -- the updated content of the artifact, or null if the content is
+        updated_content_id -- the updated content of the artifact, or null if the content is
              unchanged.
         updated_metadata -- the updated metadata of the artifact, or null if the metadata
            is unchanged
@@ -256,26 +255,28 @@ class ArtifactStash(Stash):
         Returns the updated version.
         """
         self.user_stash.validate_permissions(auth, Action.write_project(project))
-        if updated_content is None and updated_metadata is None and  updated_parents is None:
+        if updated_content_id is None and updated_metadata is None and updated_parents is None:
             raise PtException(ErrorKind.Constraint,
-                "Update must update something")
-        old = self.retrieve_version(
-            auth, project, artifact_id,
-            version_id
-        )
-        if old.status != VersionStatus.Working:
+                              "Update must update something")
+
+        ver = self.retrieve_version(auth, project, artifact_id, version_id)
+        if ver.status != VersionStatus.Working:
             raise PtException(ErrorKind.Constraint,
-                "Can only update a working version")
-        new_version: ArtifactVersion = copy.replace(old, timestamp =  datetime.now())
-        if updated_content is not None:
-            new_version = copy.replace(new_version, content = updated_content)
+                              "Can only update a working version")
+
+        if updated_content_id is not None:
+            self.versions.update_one({"_id": version_id}, {
+                "$set": {"content_id": str(updated_content_id)}
+            })
         if updated_metadata is not None:
-            new_version = copy.replace(new_version, metadata = updated_metadata)
+            self.versions.update_one({"_id": version_id}, {
+                "$set": {"metadata": updated_metadata}
+            })
         if updated_parents is not None:
-            new_version = copy.replace(new_version, parents = updated_parents)
-        with shelve.open(self.db_path) as shelf:
-            shelf[VERSIONS][project][new_version.id] = new_version.to_dict()
-        return new_version
+            self.versions.update_one({"_id": str(version_id)}, {
+                "$set": {"parents": list(str(p) for p in updated_parents)}
+            })
+        return self.retrieve_version(auth, project, artifact_id, version_id)
 
     def commit_working_version(
         self,
@@ -297,12 +298,18 @@ class ArtifactStash(Stash):
         self.user_stash.validate_permissions(auth, Action.write_project(project))
         now = datetime.now()
         version = self.retrieve_version(auth, project, artifact_id, version_id)
-        if version.status != VersionStatus.Working:
+        if version.status != VersionStatus.Working.value:
             raise PtException(ErrorKind.Constraint,
-                "Can only commit a working version"
-                )
-        with shelve.open(self.db_path) as shelf:
-            shelf[VERSIONS][project][version_id] = copy.replace(version, status = VersionStatus.Committed).to_dict()
+                              "Can only commit a working version")
+        new_id = self.depot.storage.commit_transient(version.content_id)
+        version.content_id = new_id
+
+        self.versions.update_one({"_id": str(version_id)}, {
+            "$set": {
+                "content_id": str(new_id),
+                "status": VersionStatus.Committed.value
+            }
+        })
 
     def abort_working_version(
         self,
@@ -322,18 +329,17 @@ class ArtifactStash(Stash):
         ver_id -- the version_id of the working version.
         """
         self.user_stash.validate_permissions(auth, Action.write_project(project))
-        now = datetime.now()
-        version = self.retrieve_version(
-            auth, project, art_id, ver_id)
+        version = self.retrieve_version(auth, project, art_id, ver_id)
         if version.status != VersionStatus.Working:
             raise PtException(ErrorKind.Constraint,
-                "Can only abort a working version"
-            )
-        with shelve.open(self.db_path) as shelf:
-            shelf[VERSIONS][project][ver_id] = copy.replace(version,
-                                                            status = VersionStatus.Aborted,
-                                                            timestamp = now,
-                                                            content = "").to_dict()
+                              "Can only abort a working version"
+                              )
+        self.depot.storage.delete_transient(version.content_id)
+        self.versions.update_one({"_id": str(version.id)},
+                                 {"$set": {
+                                     "content_id": None,
+                                     "status": VersionStatus.Aborted
+                                 }})
 
     def retrieve_version_status(
         self,
@@ -425,14 +431,14 @@ class ArtifactStash(Stash):
         src_queue.append(src)
         tgt_queue: List[Id[ArtifactVersion]] = []
         tgt_queue.append(tgt)
-        while len(source_hist & target_hist) == 0 and len(src_queue) > 0 and len(tgt_queue)> 0:
+        while len(source_hist & target_hist) == 0 and len(src_queue) > 0 and len(tgt_queue) > 0:
             if len(src_queue) > 0:
                 nxt = src_queue.pop(0)
                 if nxt not in source_hist:
                     source_hist.add(nxt)
                     for p in self.fetch_parents(auth, project, artifact_id, nxt):
                         src_queue.append(p)
-            if len(source_hist & target_hist) == 0 and  len(tgt_queue) > 0:
+            if len(source_hist & target_hist) == 0 and len(tgt_queue) > 0:
                 nxt = tgt_queue.pop(0)
                 if nxt not in target_hist:
                     target_hist.add(nxt)
@@ -441,12 +447,5 @@ class ArtifactStash(Stash):
         ancestors = source_hist & target_hist
         if len(ancestors) == 0:
             raise PtException(ErrorKind.Internal,
-                "Two versions of an artifact have no common ancestor. This should be impossible")
+                              "Two versions of an artifact have no common ancestor. This should be impossible")
         return ancestors.pop()
-
-    def init_storage(self, config: Config) -> None:
-        with shelve.open(self.db_path) as shelf:
-            if shelf.get(ARTIFACTS) is None:
-                shelf[ARTIFACTS] = {}
-            if shelf.get(VERSIONS) is None:
-                shelf[VERSIONS] = {}

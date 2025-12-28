@@ -2,35 +2,42 @@
 import copy
 from datetime import datetime, timedelta
 import hashlib
-import os
-import shelve
-from typing import List, NamedTuple, Tuple
+from typing import List, TypedDict
 import uuid
 from polytope.common.error import ErrorKind, PtException
-from polytope.common.stashable.action import Action, ActionLevel, ActionScopeType
-from polytope.common.stashable.user import AuthenticatedUser, User
+from polytope.common.stashable.user import Action, ActionLevel, ActionScopeType, AuthenticatedUser, User
 from polytope.depot.config import Config
 from polytope.depot.depot import Depot
 from polytope.depot.stashes.stash import Stash
 
-TOKENS = "tokens"
-USERS = "users"
 
-class AuthEntry(NamedTuple):
-    user: AuthenticatedUser
+class AuthEntry(TypedDict):
+    _id: str
     token: str
-    expiration: datetime
+    exp: str
+
 
 class UserStash(Stash):
-    """
-    Schema:
-        shelf[USERS][Id[User]]: User
-        shelf[TOKENS][user_id: str]: AuthEntry
-    """
-    def __init__(self, db_dir: str, depot: Depot) -> None:
-        self.db_dir = db_dir
+
+    def __init__(self, depot: Depot) -> None:
         self.depot = depot
-        self.db_path = os.path.join("db_dir", "users'db")
+        self.db = depot.db
+        self.users = self.db.get_collection("users")
+        self.auths = self.db.get_collection("auths")
+
+    def init_storage(self, cfg: Config) -> None:
+        u = self.users.find_one({"_id": cfg["user"]["root_user"]})
+        if u is None:
+            self.users.insert_one(
+                User(user_id=cfg["user"]["root_user"],
+                     full_name="The Dreaded Administrator",
+                     email=cfg["user"]["root_email"],
+                     password=self._salted_hash(cfg["user"]["password"], cfg["user"]["root_user"]),
+                     permitted_actions=[Action(ActionScopeType.Global,
+                                               "*", ActionLevel.Admin)],
+                     timestamp=datetime.now(),
+                     active=True).to_dict()
+            )
 
     def validate_permissions(
             self, auth: AuthenticatedUser, action: Action) -> None:
@@ -50,7 +57,7 @@ class UserStash(Stash):
                 "User permission denied"
             )
 
-    def _salted_hash(self, username: str, pw: str) -> str:
+    def _salted_hash(self, key: str, *parts: str) -> str:
         """
         Compute the salted hash of a user password for authentication.
 
@@ -58,213 +65,200 @@ class UserStash(Stash):
         username -- the name of the user to authenticate
         password -- the plaintext, unsalted password.
         """
-        salt: int =  0
-        for c in username:
-            salt = int(salt * 37 + ord(c) / 211)
-
+        salt: int = 0
+        for part in parts:
+            for c in part:
+                salt = int(salt * 37 + ord(c) / 211)
         sha = hashlib.sha256()
         sha.update(str(salt).encode())
-        sha.update(pw.encode())
+        sha.update(key.encode())
         return sha.hexdigest()
 
+    def _generate_auth_token(self, user_id: str) -> AuthEntry:
+        auth = self.auths.find_one({"_id": user_id})
 
-    def generate_auth_token(self, auth: AuthenticatedUser) -> Tuple[str, datetime]:
-        with shelve.open(self.db_path) as shelf:
-            existing_auth = shelf[TOKENS].get(auth.user_id)
-            if existing_auth is not None:
-                if existing_auth.expiration > (datetime.now() + timedelta(days=1)):
-                    return (existing_auth.token, existing_auth.expiration)
-                else:
-                    del shelf[TOKENS][auth.user_id]
-
+        if auth is None or (
+                datetime.fromisoformat(auth["expiration"]) < (datetime.now() + timedelta(days=1))):
             token_id = uuid.uuid4().hex
-            token = f"{auth.user_id}/{token_id}"
+            token = f"{user_id}/{token_id}"
             exp = datetime.now() + timedelta(weeks=1)
-            shelf[TOKENS][auth.user_id] = AuthEntry(auth, token, exp)
-            return (token, exp)
+            auth = AuthEntry(_id=user_id, token=token, exp=exp.isoformat())
+            self.auths.insert_one(auth)
+        return auth
 
-    def validate_auth_token(self, user_id: str, token: str) -> AuthenticatedUser | None:
-        with shelve.open(self.db_path) as shelf:
-            entry: AuthEntry = shelf[TOKENS].get(user_id)
-            if entry is not None:
-                if entry.token == token and entry.expiration > datetime.now():
-                    return entry.user
-        return None
+    def get_auth(self, user_id: str) -> AuthEntry:
+        auth = self.auths.find_one({"_id": user_id})
+        if auth is None:
+            raise PtException(ErrorKind.NotFound, f"User {user_id} not found")
+        return auth
 
+    def validate_auth_token(self, user_id: str, token: str) -> AuthenticatedUser:
+        entry = self.get_auth(user_id)
+        if entry is not None and entry["token"] == token and datetime.fromisoformat(entry["exp"]) > datetime.now():
+            user = self.get_user(user_id)
+            return AuthenticatedUser(user_id, entry["token"], user.permitted_actions)
+        else:
+            raise PtException(ErrorKind.Authentication,
+                              "authentication failed")
+
+    def get_user(self, user_id: str) -> User:
+        user_dict = self.users.find_one({"_id": user_id})
+        if user_dict is None:
+            raise PtException(ErrorKind.NotFound,
+                              f"User {user_id} not found")
+        else:
+            return User.from_dict(user_dict)
 
     def authenticate(
         self,
-        username: str,
-        password: str
-    ) ->  AuthenticatedUser:
+        user_id: str,
+        code: str,
+        nonce: str
+    ) -> AuthenticatedUser:
         """
         Authenticate a user.
 
-        If the user password is correct, and the user is
-         active, return an authenticated user containing
-         an authentication token for the user.
-         """
-        with shelve.open(self.db_path) as shelf:
-            user: User | None = shelf[USERS].get(username)
-            if user is None:
-                raise PtException(
-                    ErrorKind.NotFound,
-                    f"User {username} not found"
-                )
-            if not user.active:
-                raise PtException(ErrorKind.Authentication,
-                    f"Authentication failed for user {username}")
-            hashed_from_user = self._salted_hash(username, password)
-            if hashed_from_user != user.password:
-                raise PtException(
-                    ErrorKind.Authentication,
-                    "Authentication failed"
-                )
-            return AuthenticatedUser(username, hashed_from_user, user.permitted_actions)
+        We want to be at least a little bit smart about authentication.
+        We definitely don't want to be storing the user's password in
+        plaintext, and we don't want to be sending a plaintext password
+        in the API request. So instead, we're going to play some
+        games with hashing.
+
+        What we store in the DB for the user's password is going
+        to be a hash computed from the user's password with a salt:
+            password_in_db = hash(salt + password)
+
+            where salt=sum(c in username)
+
+        Then for authentication, we're going to compute an authentication
+        hash:
+            auth_hash = hash(username + password_in_db + nonce)
+        """
+
+        user: User = self.get_user(user_id)
+        if not user.active:
+            raise PtException(ErrorKind.Authentication,
+                              f"Authentication failed for user {user_id}")
+
+        sha = hashlib.sha256()
+        sha.update(user_id.encode())
+        sha.update(user.password.encode())
+        sha.update(nonce.encode())
+        if code != sha.hexdigest():
+            raise PtException(
+                ErrorKind.Authentication,
+                "Authentication failed"
+            )
+        auth = self._generate_auth_token(user_id)
+        return AuthenticatedUser(user_id=user_id,
+                                 auth_token=auth["token"],
+                                 permitted_actions=user.permitted_actions)
 
     def retrieve_user(
         self,
         auth: AuthenticatedUser,
-        username: str
+        user_id: str
     ) -> User:
         """
         Return a user record for a user of the system.
         The returned record will have its password field redacted.
         """
-        if auth.user_id != username:
-            self.validate_permissions(
-                auth, Action.admin_users())
-        with shelve.open(self.db_path) as shelf:
-            result = shelf[USERS].get(username)
-            if result is None:
-                raise PtException(ErrorKind.NotFound,
-                    f"User {username} not found")
-            return copy.replace(result, password = "<redacted>")
+        if auth.user_id != user_id:
+            self.validate_permissions(auth, Action.admin_users())
+        result = self.get_user(auth.user_id)
+        if result is not None:
+            return copy.replace(result, password="<redacted>")
+        else:
+            raise PtException(ErrorKind.NotFound,  f"User {user_id} not found")
 
-    def create(self,
+    def create(
+        self,
         auth: AuthenticatedUser,
-        username: str,
+        user_id: str,
         full_name: str,
         email: str,
         permitted_actions: List[Action],
         password: str
     ) -> User:
         self.validate_permissions(auth, Action.admin_users())
-        with shelve.open(self.db_path) as shelf:
-            user = shelf[USERS].get(username)
-            if user is not None:
-                raise PtException(ErrorKind.InvalidParameter,
-                    f"User with username '{username}' already exists"
-                )
-            encodedPassword = self._salted_hash(username, password)
-            user = User(
-                username,
-                full_name,
-                permitted_actions,
-                email,
-                encodedPassword,
-                datetime.now(),
-                True)
-            shelf[USERS][username] = user
-            return copy.replace(user, password = "<redacted>")
+        user = self.users.find_one({"_id": user_id})
+        if user is not None:
+            raise PtException(ErrorKind.InvalidParameter,
+                              f"User with username '{user_id}' already exists")
+        encodedPassword = self._salted_hash(password, user_id)
+        new_user = User(user_id=user_id,
+                        full_name=full_name,
+                        email=email,
+                        password=encodedPassword,
+                        timestamp=datetime.now(),
+                        active=True,
+                        permitted_actions=permitted_actions)
+        self.users.insert_one(new_user.to_dict())
+        user = copy.replace(new_user, password="<redacted>")
+        return user
 
-
-    def deactivate_user(self, auth: AuthenticatedUser, userid: str) -> User:
+    def deactivate_user(self, auth: AuthenticatedUser, user_id: str) -> User:
         self.validate_permissions(auth, Action.admin_users())
-        with shelve.open(self.db_path) as shelf:
-            user = shelf[USERS].get(userid)
-            if user is None:
-                raise PtException(ErrorKind.NotFound,
-                    f"User {userid} not found")
-            updated = copy.replace(user, active = False)
-            shelf[USERS][userid] = updated
-            return copy.replace(user, password = "<redacted>")
+        result = self.users.update_one({"_id": user_id},  {"$set": {
+            "active": False
+        }})
+        if result.modified_count != 1:
+            raise PtException(ErrorKind.NotFound, f"User {user_id} does not exist")
+        return copy.replace(self.get_user(user_id), password="<redacted>")
 
     def reactivateUser(self,
                        auth: AuthenticatedUser,
-                       userid: str) -> User:
+                       user_id: str) -> User:
         self.validate_permissions(auth, Action.admin_users())
-        with shelve.open(self.db_path) as shelf:
-            user = shelf[USERS].get(userid)
-            if user is None:
-                raise PtException(ErrorKind.NotFound,
-                    f"User {userid} not found")
-            updated = copy.replace(user, active = True)
-            shelf[USERS][userid] = updated
-            return copy.replace(user, password = "<redacted>")
+        update = self.users.update_one({"_id": user_id}, {
+            "$set": {
+                "active": True
+            }})
+        if update.modified_count != 1:
+            raise PtException(ErrorKind.NotFound, f"User {user_id} does not exist")
+        return copy.replace(self.get_user(user_id), password="<redacted>")
 
-    def grantPermissions(self,
-        auth: AuthenticatedUser,
-        username: str, perms: List[Action]
+    def grantPermissions(
+            self,
+            auth: AuthenticatedUser,
+            user_id: str,
+            perms: List[Action]
     ) -> User:
         self.validate_permissions(auth, Action.admin_users())
-        with shelve.open(self.db_path) as shelf:
-            user = shelf[USERS].get(username)
-            if user is None:
-                raise PtException(ErrorKind.NotFound,
-                    f"User {username} not found")
-
-            new_perms = user.permitted_actions
-            for act in perms:
-                if act not in new_perms:
-                    new_perms.append(act)
-            user.permitted_actions = new_perms
-            shelf[USERS][username] = new_perms
-            return copy.replace(user, password = "<redacted>")
+        user = self.get_user(user_id)
+        updated_perms: List[Action] = [*user.permitted_actions]
+        for p in perms:
+            if p not in user.permitted_actions:
+                updated_perms.append(p)
+        self.users.update_one({"_id": user_id},
+                              {"$set": {
+                                  "permitted_actions": list(p.to_dict() for p in updated_perms)
+                              }})
+        return copy.replace(self.get_user(user_id), password="<redacted>")
 
     def revokePermission(
-        self,
-        auth: AuthenticatedUser,
-        username: str, perms: List[Action]) -> User:
+            self,
+            auth: AuthenticatedUser,
+            user_id: str, perms: List[Action]) -> User:
         self.validate_permissions(auth, Action.admin_users())
-        with shelve.open(self.db_path) as shelf:
-            user: User = shelf[USERS].get(username)
-            if user is None:
-                raise PtException(ErrorKind.NotFound,
-                    f"User {username} not found")
-            new_permissions: List[Action] = user.permitted_actions
-            for perm in perms:
-                if perm in new_permissions:
-                    new_permissions.remove(perm)
-            user = copy.replace(user, permitted_actions = new_permissions)
-            shelf[USERS][username] = user
-            return copy.replace(user, password = "<redacted>")
-
-
-    def list(self, auth: AuthenticatedUser) -> List[User]:
-        self.validate_permissions(auth, Action.read_users())
-        with shelve.open(self.db_path) as shelf:
-            result: List[User] = []
-            for key in shelf[USERS].keys():
-                result.append(shelf[USERS][key])
-            return result
+        user = self.get_user(user_id)
+        updated_perms: List[Action] = [*user.permitted_actions]
+        for p in perms:
+            if p in user.permitted_actions:
+                updated_perms.remove(p)
+        self.users.update_one({"_id": user_id},
+                              {"$set": {
+                                  "permitted_actions": list(p.to_dict() for p in updated_perms)
+                              }})
+        return copy.replace(self.get_user(user_id), password="<redacted>")
 
     def updatePassword(self,
-                       auth: AuthenticatedUser, userid: str, password: str)-> User:
-        if auth.user_id != userid:
+                       auth: AuthenticatedUser, user_id: str, password: str) -> User:
+        if auth.user_id != user_id:
             self.validate_permissions(auth, Action.admin_users())
-        with shelve.open(self.db_path) as shelf:
-            user = shelf[USERS].get(userid)
-            if user is None:
-                raise PtException(ErrorKind.NotFound,
-                    f"User {userid} not found")
-            salted = self._salted_hash(userid, password)
-            updated = copy.replace(user, password = salted)
-            shelf[USERS][userid] = updated
-            return copy.replace(user, password = "<redacted>")
-
-    def init_storage(self, config: Config) -> None:
-        with shelve.open(self.db_path) as shelf:
-            if shelf.get(USERS) is None:
-                root = User(
-                    username = config.root_user,
-                    full_name = "The Dreaded Administrator",
-                    permitted_actions = [Action(ActionScopeType.Global, "*", ActionLevel.Admin)],
-                    email = config.root_email,
-                    password = self._salted_hash(config.root_user, config.password),
-                    timestamp = datetime.now(),
-                    active = True
-                )
-                shelf[USERS] =  { config.root_user: root }
-            if shelf.get(TOKENS) is None:
-                shelf[TOKENS] = {}
+        salted = self._salted_hash(password, user_id)
+        result = self.users.update_one({"_id": user_id},
+                                       {"$set": {
+                                           "password": salted
+                                       }})
+        return copy.replace(self.get_user(user_id), password="<redacted>")

@@ -14,7 +14,10 @@
 
 from datetime import datetime
 import json
+import tempfile
 from typing import List, Tuple
+
+from pytest import fixture
 
 from polytope.common.agents.text import (
     LabeledLine,
@@ -25,25 +28,42 @@ from polytope.common.agents.text import (
 )
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion, VersionStatus
 from polytope.common.stashable.ids import Id, IdKind
+from polytope.depot.storage.storage import Content, FileStorage, Storage
 
 
 class TestTextAgent:
+
+    @fixture
+    def storage(self):
+        with tempfile.TemporaryDirectory(dir="tmp") as dir:
+            storage = FileStorage(dir)
+            yield storage
+
+    @fixture
+    def text_agent(self, storage) -> TextAgent:
+        return TextAgent(storage)
+
     def build_text_versions(
         self,
+        agent: TextAgent,
         ancestor_content: List[str],
         source_content: List[str],
         target_content: List[str],
     ) -> Tuple[ArtifactVersion, ArtifactVersion, ArtifactVersion]:
         art_id: Id[Artifact] = Id.new_id(IdKind.ID_ARTIFACT)
+        ancestor_cid = agent.storage.put(
+            agent.encode_to_bytes(TextContent(ancestor_content)))
+        source_cid = agent.storage.put(
+            agent.encode_to_bytes(TextContent(source_content)))
+        target_cid = agent.storage.put(
+            agent.encode_to_bytes(TextContent(target_content)))
         ancestor_ver = ArtifactVersion(
             id=Id.new_id(IdKind.ID_VERSION),
             artifact_id=art_id,
-            artifact_type=TextAgent.get().artifact_type,
+            artifact_type="text",
             timestamp=datetime.now(),
             creator="me",
-            content=TextAgent.get().encode_to_bytes(
-                TextContent(ancestor_content)
-            ),
+            content_id=ancestor_cid,
             parents=[],
             metadata={},
             status=VersionStatus.Committed,
@@ -51,10 +71,10 @@ class TestTextAgent:
         sourceVer = ArtifactVersion(
             id=Id.new_id(IdKind.ID_VERSION),
             artifact_id=art_id,
-            artifact_type=TextAgent.get().artifact_type,
+            artifact_type="text",
             timestamp=datetime.now(),
             creator="me",
-            content=TextAgent.get().encode_to_bytes(TextContent(source_content)),
+            content_id=source_cid,
             parents=[ancestor_ver.id],
             metadata={},
             status=VersionStatus.Committed,
@@ -62,27 +82,27 @@ class TestTextAgent:
         targetVer = ArtifactVersion(
             id=Id.new_id(IdKind.ID_VERSION),
             artifact_id=art_id,
-            artifact_type=TextAgent.get().artifact_type,
+            artifact_type="text",
             timestamp=datetime.now(),
             creator="me",
-            content=TextAgent.get().encode_to_bytes(TextContent(target_content)),
+            content_id=target_cid,
             parents=[ancestor_ver.id],
             metadata={},
             status=VersionStatus.Committed,
         )
         return (ancestor_ver, sourceVer, targetVer)
 
-    def test_encode_decode_text_content(self) -> None:
+    def test_encode_decode_text_content(self, text_agent: TextAgent) -> None:
         content = ["aaa\n", "bbb\n", "ccc\n", "ddd\n", "eeee\n"]
-        encoded = TextAgent.get().encode_to_bytes(TextContent(content))
-        decoded = TextAgent.get().decode_from_bytes(encoded)
-        assert content == decoded.content
+        encoded = text_agent.encode_to_bytes(TextContent(content))
+        decoded = text_agent.decode_from_bytes(encoded)
+        assert content == decoded.lines
 
-    def test_line_labeled_diff(self) -> None:
+    def test_line_labeled_diff(self, storage: Storage, text_agent: TextAgent) -> None:
         ancestor_text = ["a\n", "b\n", "c\n", "d\n", "e\n"]
         source_text = ["a\n", "c\n", "q\n", "d\n", "e\n"]
 
-        lab = TextAgent.get().create_labeled_list(ancestor_text, source_text)
+        lab = text_agent.create_labeled_list(ancestor_text, source_text)
         assert 6 == len(lab)
         assert LabeledLine(LineLabel.Unmodified, "a\n", 0, 0, 1) == lab[0]
         assert LabeledLine(LineLabel.Deleted, "b\n", 1, None, 2) == lab[1]
@@ -91,18 +111,18 @@ class TestTextAgent:
         assert LabeledLine(LineLabel.Unmodified, "d\n", 3, 3, 4) == lab[4]
         assert LabeledLine(LineLabel.Unmodified, "e\n", 4, 4, 5) == lab[5]
 
-    def test_coalesce_lines_into_blocks(self) -> None:
+    def test_coalesce_lines_into_blocks(self, storage: Storage, text_agent: TextAgent) -> None:
         ancestor_text = ["a\n", "b\n", "c\n", "d\n", "e\n"]
         source_text = ["a\n", "c\n", "q\n", "d\n", "e\n"]
         target_text = ["a\n", "b\n", "c\n", "d\n", "e\n"]
 
-        labeled_src = TextAgent.get().create_labeled_list(
+        labeled_src = text_agent.create_labeled_list(
             ancestor_text, source_text
         )
-        labeled_tgt = TextAgent.get().create_labeled_list(
+        labeled_tgt = text_agent.create_labeled_list(
             ancestor_text, target_text
         )
-        coalesced = TextAgent.get().coalesce_lines_to_blocks(
+        coalesced = text_agent.coalesce_lines_to_blocks(
             labeled_src, labeled_tgt
         )
         ct = json.dumps(
@@ -143,16 +163,16 @@ class TestTextAgent:
         )
         assert ct == et
 
-    def test_merge_no_conflicts(self) -> None:
+    def test_merge_no_conflicts(self, storage: Storage, text_agent: TextAgent) -> None:
         ancestor_text = ["a\n", "b\n", "c\n", "d\n", "e\n"]
         source_text = ["a\n", "c\n", "q\n", "d\n", "e\n"]
         target_text = ["a\n", "b\n", "c\n", "d\n", "e\n"]
 
-        (anc, src, tgt) = self.build_text_versions(
-            ancestor_text, source_text, target_text
-        )
+        (anc, src, tgt) = self.build_text_versions(text_agent,
+                                                   ancestor_text, source_text, target_text
+                                                   )
 
-        merge = TextAgent.get().merge(anc, src, tgt)
-        proposed = TextAgent.get().decode_from_bytes(merge.proposed_merge)
-        assert source_text == proposed.content
+        merge = text_agent.merge(anc, src, tgt)
+        proposed = text_agent.decode_from_bytes(merge.proposed_merge)
+        assert source_text == proposed.lines
         assert 0 == len(merge.conflicts)

@@ -158,13 +158,6 @@ class DirectoryMergeConflict(NamedTuple):
 class DirectoryAgent(Agent[Directory]):
     instance: "DirectoryAgent | None" = None
 
-    @classmethod
-    def get(cls) -> "DirectoryAgent":
-        if cls.instance is None:
-            cls.instance = DirectoryAgent()
-        return cls.instance
-
-    @property
     def artifact_type(self) -> str:
         return "directory"
 
@@ -247,9 +240,12 @@ class DirectoryAgent(Agent[Directory]):
         source: ArtifactVersion,
         target: ArtifactVersion,
     ) -> MergeResult:
-        anc_dir = self.decode_from_bytes(ancestor.content)
-        src_dir = self.decode_from_bytes(source.content)
-        tgt_dir = self.decode_from_bytes(target.content)
+        anc_content = self.storage.get(ancestor.content_id)
+        src_content = self.storage.get(source.content_id)
+        tgt_content = self.storage.get(target.content_id)
+        anc_dir = self.decode_from_bytes(anc_content)
+        src_dir = self.decode_from_bytes(src_content)
+        tgt_dir = self.decode_from_bytes(tgt_content)
         anc_bindings = DualMapping.from_directory(anc_dir)
         src_bindings = DualMapping.from_directory(src_dir)
         tgt_bindings = DualMapping.from_directory(tgt_dir)
@@ -258,7 +254,7 @@ class DirectoryAgent(Agent[Directory]):
             return MergeConflict(
                 id=Id[MergeConflict].new_id(IdKind.ID_CONFLICT),
                 artifact_id=ancestor.artifact_id,
-                artifact_type=self.artifact_type,
+                artifact_type=self.artifact_type(),
                 source_version=source.id,
                 target_version=target.id,
                 details=detail.encode_to_bytes(),
@@ -439,7 +435,7 @@ class DirectoryAgent(Agent[Directory]):
 
         # assemble into a merge result.
         return MergeResult(
-            artifact_type=self.artifact_type,
+            artifact_type=self.artifact_type(),
             artifact_id=ancestor.artifact_id,
             ancestor_version=ancestor.id,
             source_version=source.id,

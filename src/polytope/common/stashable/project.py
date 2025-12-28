@@ -54,7 +54,6 @@ class Project(NamedTuple):
             histories=dict["histories"]
         )
 
-
     def __repr__(self):
         hists = ", ".join([str(h) for h in self.histories])
         return textwrap.dedent(f"""\
