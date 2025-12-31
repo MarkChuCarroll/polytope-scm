@@ -7,10 +7,11 @@ licence = "Apache-2.0"
 license-files = ["LICENSE" ]
 requires-python = ">=3.14"
 dependencies = [
+ "falcon>=4.2.0",
+ "falcon-auth[backend-jwt]>=1.1.0",
  "mypy>=1.19.1",
  "pymongo>=4.15.5",
  "pytest>=9.0.2",
- "sqlalchemy>=2.0.45",
 ]
 authors = [
    { name = "Mark C. Chu-Carroll", email = "markcc@gmail.com"}

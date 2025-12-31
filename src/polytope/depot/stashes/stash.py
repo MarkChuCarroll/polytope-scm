@@ -1,18 +1,29 @@
+# Copyright 2025 Mark C. Chu-Carroll
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http: // www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-from abc import abstractmethod
+
 import shelve
 from typing import Any, List, Protocol
 
 from polytope.common.error import ErrorKind, PtException
 from polytope.depot.config import Config
 
+
 class Stash(Protocol):
-
-
     def init_storage(self, config: Config) -> None: ...
 
-    def get_in_shelf(self, shelf: shelve.Shelf, keys: List[Any],
-                     error: str) -> Any:
+    def get_in_shelf(self, shelf: shelve.Shelf, keys: List[Any], error: str) -> Any:
         layer: shelve.Shelf | None = shelf
         for key in keys:
             if layer is None:
@@ -22,8 +33,7 @@ class Stash(Protocol):
             raise PtException(ErrorKind.NotFound, error)
         return layer
 
-    def set_in_shelf(self, shelf: shelve.Shelf, keys: List[Any],
-                     value: Any) -> None:
+    def set_in_shelf(self, shelf: shelve.Shelf, keys: List[Any], value: Any) -> None:
         layer: shelve.Shelf | None = shelf
         last = keys[-1]
         prefix = keys[:-1]

@@ -14,12 +14,13 @@
 
 
 from abc import abstractmethod, ABC
+import base64
 import hashlib
 import textwrap
-from typing import List, NamedTuple, Protocol, Tuple
+from typing import List, NamedTuple
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion
 from polytope.common.stashable.ids import Id
-from polytope.depot.depot import Depot
+from polytope.common.stashable.stashable import JDict
 from polytope.depot.storage.storage import Storage
 
 
@@ -39,6 +40,27 @@ class MergeConflict(NamedTuple):
             Target version: {self.target_version}
             """)
 
+    def to_dict(self) -> JDict:
+        return {
+            "_id": str(self.id),
+            "artifact_id": str(self.artifact_id),
+            "artifact_type": str(self.artifact_type),
+            "source_version": str(self.source_version),
+            "target_version": str(self.target_version),
+            "details": base64.b64encode(self.details)
+        }
+
+    @classmethod
+    def from_dict(cls, d: JDict) -> "MergeConflict":
+        return MergeConflict(
+            id=Id.from_string(d["_id"]),
+            artifact_id=Id.from_string(d["artifact_id"]),
+            artifact_type=d["artifact_type"],
+            source_version=Id.from_string(d["source_version"]),
+            target_version=Id.from_string(d["target_version"]),
+            details=base64.b64decode(d["details"])
+        )
+
 
 class MergeResult(NamedTuple):
     artifact_type: str
@@ -48,6 +70,29 @@ class MergeResult(NamedTuple):
     target_version: Id[ArtifactVersion]
     proposed_merge: bytes
     conflicts: List[MergeConflict]
+
+    def to_dict(self) -> JDict:
+        return {
+            "artifact_type": self.artifact_type,
+            "artifact_id": str(self.artifact_id),
+            "ancestor_version": str(self.ancestor_version),
+            "source_version": str(self.source_version),
+            "target_version": str(self.target_version),
+            "proposed_merge": base64.b16encode(self.proposed_merge),
+            "conflicts": list(l.to_dict() for l in self.conflicts)
+        }
+
+    @classmethod
+    def from_dict(cls, d: JDict) -> "MergeResult":
+        return MergeResult(
+            artifact_type=d["artifact_type"],
+            artifact_id=Id.from_string(d["artifact_id"]),
+            ancestor_version=Id.from_string(d["ancestor_version"]),
+            source_version=Id.from_string(d["source_version"]),
+            target_version=Id.from_string(d["target_version"]),
+            proposed_merge=base64.b64decode(d["proposed_merge"]),
+            conflicts=list(MergeConflict.from_dict(mc) for mc in d["conflicts"])
+        )
 
 
 class Agent[T](ABC):

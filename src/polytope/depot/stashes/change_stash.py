@@ -15,6 +15,7 @@
 
 from datetime import datetime
 from typing import List
+
 from polytope.common.error import ErrorKind, PtException
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion
 from polytope.common.stashable.change import Change, ChangeStatus, SavePoint
@@ -30,11 +31,6 @@ class ChangeStash(Stash):
     """
     The stash for storing changes and savepoints within changes.
 
-    Storage schema:
-
-        stash[CHANGE][project: str][history: str][id: Id[Change]]: Change
-        stash[CHANGE_INDEX][project: str][history: str][name: str]: Id[Change]
-        stash[SAVEPOINT][project: str][history: str][id: Id[SavePoint]]: SavePoint
     """
 
     def __init__(self, depot: Depot) -> None:
@@ -50,32 +46,25 @@ class ChangeStash(Stash):
         return self.depot.user_stash
 
     def retrieve_change(
-            self,
-            auth: AuthenticatedUser,
-            project: str,
-            id: Id[Change]) -> Change:
+        self, auth: AuthenticatedUser, project: str, id: Id[Change]
+    ) -> Change:
         """
         Retrieve a change.
         auth -- the user performing the operation.
         project -- the project containing the change.
         id -- the change ID.
-        @return the change
+
+        Returns the change
         """
         self.user_stash.validate_permissions(auth, Action.read_project(project))
-        ch_dict = self.changes.find_one({"_id": id,
-                                         "project": project
-                                         })
+        ch_dict = self.changes.find_one({"_id": id, "project": project})
         if ch_dict is None:
-            raise PtException(ErrorKind.NotFound,
-                              f"Change {id} not found")
+            raise PtException(ErrorKind.NotFound, f"Change {id} not found")
         return Change.from_dict(ch_dict)
 
     def get_change_id(
-            self,
-            auth: AuthenticatedUser,
-            project: str,
-            history: str,
-            change_name: str) -> Id[Change]:
+        self, auth: AuthenticatedUser, project: str, history: str, change_name: str
+    ) -> Id[Change]:
         """
         Get the ID for a named change.
 
@@ -90,11 +79,8 @@ class ChangeStash(Stash):
         return ch.id
 
     def retrieve_change_by_name(
-            self,
-            auth: AuthenticatedUser,
-            project: str,
-            history: str,
-            change_name: str) -> Change:
+        self, auth: AuthenticatedUser, project: str, history: str, change_name: str
+    ) -> Change:
         """
         Retrieve a change by name.
 
@@ -107,12 +93,14 @@ class ChangeStash(Stash):
         Returns the change
         """
         self.user_stash.validate_permissions(auth, Action.read_project(project))
-        ch_dict = self.changes.find_one({"project": project,
-                                         "history": history,
-                                         "name": change_name})
+        ch_dict = self.changes.find_one(
+            {"project": project, "history": history, "name": change_name}
+        )
         if ch_dict is None:
-            raise PtException(ErrorKind.NotFound,
-                              f"Change named {change_name} not found in history {history} of project {project}")
+            raise PtException(
+                ErrorKind.NotFound,
+                f"Change named {change_name} not found in history {history} of project {project}",
+            )
         return Change.from_dict(ch_dict)
 
     def create_change(
@@ -122,7 +110,7 @@ class ChangeStash(Stash):
         history: str,
         change_name: str,
         basis: ProjectVersionSpecifier,
-        description: str
+        description: str,
     ) -> Change:
         """
         Create a new change
@@ -139,8 +127,10 @@ class ChangeStash(Stash):
         """
 
         self.user_stash.validate_permissions(auth, Action.write_project(project_name))
-        project = self.depot.project_stash.retrieve_project(auth, project_name)
-        baseline = self.depot.project_stash.resolve_project_version_specifier(auth, basis)
+        self.depot.project_stash.retrieve_project(auth, project_name)
+        baseline = self.depot.project_stash.resolve_project_version_specifier(
+            auth, basis
+        )
 
         change = Change(
             id=Id.new_id(IdKind.ID_CHANGE),
@@ -152,7 +142,7 @@ class ChangeStash(Stash):
             description=description,
             save_points=[],
             status=ChangeStatus.Open,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
         self.changes.insert_one(change.to_dict())
         return change
@@ -163,10 +153,12 @@ class ChangeStash(Stash):
         project: str,
         history: str,
         change_name: str,
-        status: ChangeStatus
+        status: ChangeStatus,
     ) -> None:
         """
         Update the status of an in-progress change.
+
+        Arguments:
         auth -- the user performing the operation.
         project -- the project containing the change.
         history -- the history containing the change.
@@ -174,16 +166,19 @@ class ChangeStash(Stash):
         status -- the new status of the change.
         """
         self.user_stash.validate_permissions(auth, Action.write_project(project))
-        update = self.changes.update_one({"project": project,
-                                          "history": history,
-                                          "name": change_name,
-                                          },
-                                         {"$set": {
-                                             "status": status.value
-                                         }})
+        update = self.changes.update_one(
+            {
+                "project": project,
+                "history": history,
+                "name": change_name,
+            },
+            {"$set": {"status": status.value}},
+        )
         if update.modified_count != 1:
-            raise PtException(ErrorKind.NotFound,
-                              f"Change named {change_name} not found in history {history} of project {project}")
+            raise PtException(
+                ErrorKind.NotFound,
+                f"Change named {change_name} not found in history {history} of project {project}",
+            )
 
     def create_save_point(
         self,
@@ -194,7 +189,7 @@ class ChangeStash(Stash):
         changed_artifacts: List[Id[Artifact]],
         description: str,
         basis: ProjectVersionSpecifier,
-        baseline_version: Id[ArtifactVersion]
+        baseline_version: Id[ArtifactVersion],
     ) -> SavePoint:
         """
         Create a save point in an open change.
@@ -217,18 +212,18 @@ class ChangeStash(Stash):
         save_point = SavePoint(
             id=Id.new_id(IdKind.ID_CHANGE_SAVE),
             change_id=ch.id,
+            idx=len(ch.save_points),
             modified_artifacts=changed_artifacts,
             basis=basis,
             baseline_version=baseline_version,
             creator=auth.user_id,
             description=description,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
         self.saves.insert_one(save_point.to_dict())
-        self.changes.update_one({"_id": str(ch.id)},
-                                {"$push": {
-                                    "save_points": str(save_point.id)
-                                }})
+        self.changes.update_one(
+            {"_id": str(ch.id)}, {"$push": {"save_points": str(save_point.id)}}
+        )
         return save_point
 
     def retrieve_save_point(
@@ -237,7 +232,7 @@ class ChangeStash(Stash):
         project: str,
         history: str,
         change_name: str,
-        save_id: Id[SavePoint]
+        save_id: Id[SavePoint],
     ) -> SavePoint:
         """
         Retrieve a savepoint
@@ -253,17 +248,20 @@ class ChangeStash(Stash):
         """
         self.user_stash.validate_permissions(auth, Action.read_project(project))
         change_id = self.get_change_id(auth, project, history, change_name)
-        sp_dict = self.saves.find_one({"_id": str(save_id), "change_id": change_id})
+        sp_dict = self.saves.find_one({"_id": str(save_id)})
         if sp_dict is None:
-            raise PtException(ErrorKind.NotFound, f"Save point not found in change {change_name}")
+            raise PtException(
+                ErrorKind.NotFound, f"Save point not found in change {change_name}"
+            )
+        if sp_dict["change_id"] != str(change_id):
+            raise PtException(
+                ErrorKind.Constraint,
+                f"Save point {save_id} not found in change {change_name}",
+            )
         return SavePoint.from_dict(sp_dict)
 
     def list_save_points(
-        self,
-        auth: AuthenticatedUser,
-        project: str,
-        history: str,
-        change: str
+        self, auth: AuthenticatedUser, project: str, history: str, change: str
     ) -> List[Id[SavePoint]]:
         """
         List the save points in a change.
@@ -285,7 +283,7 @@ class ChangeStash(Stash):
         auth: AuthenticatedUser,
         project: str,
         history_name: str,
-        show: ChangeStatus
+        show: ChangeStatus,
     ) -> List[Change]:
         """
         List the changes in a history.
@@ -296,8 +294,8 @@ class ChangeStash(Stash):
         history_name -- the name of the history.
         show -- the minimum status to include in the result list. If this is "Aborted", then
            all changes, open, closed, and aborted will be included; if it's "Closed", then both open
-           and closed will be included, but aborted changes will not; if it's "Open", then all changes
-           will be included
+           and closed will be included, but aborted changes will not; if it's "Open", then all
+           changes will be included
 
         Returns a list of changes.
         """
@@ -309,7 +307,10 @@ class ChangeStash(Stash):
                 case ChangeStatus.Aborted:
                     result.append(Change.from_dict(ch))
                 case ChangeStatus.Closed:
-                    if ch.status == ChangeStatus.Closed or ch.status == ChangeStatus.Open:
+                    if (
+                        ch.status == ChangeStatus.Closed
+                        or ch.status == ChangeStatus.Open
+                    ):
                         result.append(Change.from_dict(ch))
                 case ChangeStatus.Open:
                     if ch.status == ChangeStatus.Open:

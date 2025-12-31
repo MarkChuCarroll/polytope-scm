@@ -29,14 +29,15 @@ class PVSKind(Enum):
 
 
 class ProjectVersionSpecifier:
-    def __init__(self,
-                 kind: PVSKind,
-                 project: str,
-                 history: str,
-                 change: str | None = None,
-                 idx: int | None = None,
-                 baseline: Id[ArtifactVersion] | None = None
-                 ) -> None:
+    def __init__(
+        self,
+        kind: PVSKind,
+        project: str,
+        history: str,
+        change: str | None = None,
+        idx: int | None = None,
+        baseline: Id[ArtifactVersion] | None = None,
+    ) -> None:
         self.kind = kind
         self.project = project
         self.history = history
@@ -45,15 +46,29 @@ class ProjectVersionSpecifier:
         self.baseline = baseline
 
     @classmethod
-    def make_history(cls, project: str, history: str, idx: int | None) -> "ProjectVersionSpecifier":
+    def make_history(
+        cls, project: str, history: str, idx: int | None = None
+    ) -> "ProjectVersionSpecifier":
         if idx is None:
             return cls(PVSKind.History, project=project, history=history)
         else:
-            return cls(PVSKind.HistoryVersion, project=project, history=history, idx=idx)
+            return cls(
+                PVSKind.HistoryVersion, project=project, history=history, idx=idx
+            )
 
     @classmethod
-    def make_baseline(cls, project: str, history: str, baseline: Id[ArtifactVersion]) -> "ProjectVersionSpecifier":
-        return cls(PVSKind.Baseline, project=project, history=history, baseline=baseline)
+    def make_baseline(
+        cls, project: str, history: str, baseline: Id[ArtifactVersion]
+    ) -> "ProjectVersionSpecifier":
+        return cls(
+            PVSKind.Baseline, project=project, history=history, baseline=baseline
+        )
+
+    @classmethod
+    def make_change(
+        cls, project: str, history: str, change: str, idx: int | None = None
+    ) -> "ProjectVersionSpecifier":
+        return cls(PVSKind.Change, project, history, change, idx)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -62,7 +77,7 @@ class ProjectVersionSpecifier:
             "history": self.history,
             "change": self.change,
             "idx": self.idx,
-            "baseline": (None if self.baseline is None else str(self.baseline))
+            "baseline": (None if self.baseline is None else str(self.baseline)),
         }
 
     @classmethod
@@ -73,7 +88,9 @@ class ProjectVersionSpecifier:
             history=dict["history"],
             change=dict["change"],
             idx=dict["idx"],
-            baseline=None if dict["baseline"] is None else Id.from_string(dict["baseline"])
+            baseline=None
+            if dict["baseline"] is None
+            else Id.from_string(dict["baseline"]),
         )
 
     def __repr__(self) -> str:
@@ -89,33 +106,29 @@ class ProjectVersionSpecifier:
                     return f"c:{self.project}/{self.history}/{self.change}"
             case PVSKind.Baseline:
                 return f"cs:{self.project}/{self.history}/{self.baseline}"
-            case _:
-                raise PtException(ErrorKind.InvalidParameter,
-                                  f"Invalid project version specifier: {self}")
 
     @classmethod
     def parse(cls, s: str) -> "ProjectVersionSpecifier":
         parts = s.split(":")
         if len(parts) != 2:
             raise PtException(
-                ErrorKind.Parsing,
-                f"Invalid project version specifier: $s"
+                ErrorKind.Parsing, f"Invalid project version specifier: {s}"
             )
         match parts[0]:
-            case 'h':
+            case "h":
                 return cls.parseHistoryVersionSpecifier(parts[1])
-            case 'c':
+            case "c":
                 return cls.parseChangeVersionSpecifier(parts[1])
-            case 'hv':
+            case "hv":
                 return cls.parseHistoryIndexVersionSpecifier(parts[1])
-            case 'cs':
+            case "cs":
                 return cls.parseChangeStepVersionSpecifier(parts[1])
-            case 'b':
+            case "b":
                 return cls.parseBaselineVersionSpecifier(parts[1])
             case _:
                 raise PtException(
                     ErrorKind.Parsing,
-                    f"Invalid project version specifier kind: ${parts[0]}"
+                    f"Invalid project version specifier kind: ${parts[0]}",
                 )
 
     @classmethod
@@ -123,57 +136,70 @@ class ProjectVersionSpecifier:
         regex = re.compile(r"([A-Za-z0-9_-]+)/([A-Za-z0-9]+")
         m = regex.fullmatch(spec)
         if m is not None:
-            return ProjectVersionSpecifier(PVSKind.History,
-                                           m.group(1), m.group(2))
+            return ProjectVersionSpecifier(PVSKind.History, m.group(1), m.group(2))
         else:
-            raise PtException(ErrorKind.Parsing,
-                              f"A history version specifier should have two parts,  recieved: '{spec}'")
+            raise PtException(
+                ErrorKind.Parsing,
+                f"A history version specifier should have two parts,  recieved: '{spec}'",
+            )
 
     @classmethod
     def parseHistoryIndexVersionSpecifier(cls, spec: str) -> "ProjectVersionSpecifier":
         regex = re.compile(r"([A-Za-z0-9_-]+)/([A-Za-z0-9]+)@([0-9]+)")
         m = regex.fullmatch(spec)
         if m is not None:
-            return ProjectVersionSpecifier(PVSKind.HistoryVersion,
-                                           m.group(1), m.group(2), idx=int(m.group(3)))
+            return ProjectVersionSpecifier(
+                PVSKind.HistoryVersion, m.group(1), m.group(2), idx=int(m.group(3))
+            )
         else:
-            raise PtException(ErrorKind.Parsing,
-                              "A history index version specifier must include an index")
+            raise PtException(
+                ErrorKind.Parsing,
+                "A history index version specifier must include an index",
+            )
 
     @classmethod
     def parseChangeVersionSpecifier(cls, spec: str) -> "ProjectVersionSpecifier":
         regex = re.compile(r"([A-Za-z0-9_-]+)/([A-Za-z0-9]+)/([A-Za-z0-9]+)")
         m = regex.fullmatch(spec)
         if m is not None:
-            return ProjectVersionSpecifier(PVSKind.Change,
-                                           m.group(1), m.group(2),
-                                           change=m.group(3))
+            return ProjectVersionSpecifier(
+                PVSKind.Change, m.group(1), m.group(2), change=m.group(3)
+            )
         else:
-            raise PtException(ErrorKind.Parsing,
-                              "A change version specifier must include 3 parts")
+            raise PtException(
+                ErrorKind.Parsing, "A change version specifier must include 3 parts"
+            )
 
     @classmethod
     def parseChangeStepVersionSpecifier(cls, spec: str) -> "ProjectVersionSpecifier":
         regex = re.compile(r"([A-Za-z0-9_-]+)/([A-Za-z0-9]+)/([A-Za-z0-9]+)@([0-9]+)")
         m = regex.fullmatch(spec)
         if m is not None:
-            return ProjectVersionSpecifier(PVSKind.Change,
-                                           m.group(1),
-                                           m.group(2),
-                                           change=m.group(3),
-                                           idx=int(m.group(4)))
+            return ProjectVersionSpecifier(
+                PVSKind.Change,
+                m.group(1),
+                m.group(2),
+                change=m.group(3),
+                idx=int(m.group(4)),
+            )
         else:
-            raise PtException(ErrorKind.Parsing,
-                              "A Change step version specifier must include an index")
+            raise PtException(
+                ErrorKind.Parsing,
+                "A Change step version specifier must include an index",
+            )
 
     @classmethod
     def parseBaselineVersionSpecifier(cls, spec: str) -> "ProjectVersionSpecifier":
         regex = re.compile(r"([A-Za-z0-9_-]+)/([A-Za-z0-9]+)@(.*)")
         m = regex.fullmatch(spec)
         if m is not None:
-            return ProjectVersionSpecifier(PVSKind.Baseline,
-                                           m.group(1), m.group(2),
-                                           baseline=Id.from_string(m.group(3)))
+            return ProjectVersionSpecifier(
+                PVSKind.Baseline,
+                m.group(1),
+                m.group(2),
+                baseline=Id.from_string(m.group(3)),
+            )
         else:
-            raise PtException(ErrorKind.Parsing,
-                              f"Invalid baseline specifier: `{spec}`")
+            raise PtException(
+                ErrorKind.Parsing, f"Invalid baseline specifier: `{spec}`"
+            )

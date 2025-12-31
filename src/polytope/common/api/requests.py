@@ -10,7 +10,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
- 
+
 from argparse import Action
 from enum import Enum
 from typing import List, NamedTuple
@@ -39,6 +39,7 @@ class ProjectCreateRequest(NamedTuple):
     name: str
     description: str
 
+
 class ProjectListResponse(NamedTuple):
     projects: List[Project]
 
@@ -50,6 +51,7 @@ class UserCreateRequest(NamedTuple):
     password: str
     permittedActions: List[Action]
 
+
 class UserUpdateKind(Enum):
     Reactivate = "reactivate"
     Deactivate = "deactivate"
@@ -57,10 +59,12 @@ class UserUpdateKind(Enum):
     Revoke = "revoke"
     Password = "password"
 
+
 class UserUpdateRequest(NamedTuple):
     kind: UserUpdateKind
     actions: List[Action] | None
     password: str | None
+
 
 class ChangeListResponse(NamedTuple):
     changes: List[Change]
@@ -69,8 +73,10 @@ class ChangeListResponse(NamedTuple):
 class UserListResponse(NamedTuple):
     users: List[User]
 
+
 class SavesListResponse(NamedTuple):
     saves: List[SavePoint]
+
 
 class HistoryCreateRequest(NamedTuple):
     name: str
@@ -78,45 +84,56 @@ class HistoryCreateRequest(NamedTuple):
     parent_history: str
     step: int | None
 
+
 class WorkspaceCreateRequest(NamedTuple):
     name: str
     history: str
     description: str
+
 
 class WorkspaceCreateChangeRequest(NamedTuple):
     history: str
     change_name: str
     description: str
 
+
 class WorkspaceAddFileRequest(NamedTuple):
     path: str
     artifact_type: str
     content: str
 
+
 class HistoryListResponse(NamedTuple):
     histories: List[History]
 
+
 class HistoryStepsResponse(NamedTuple):
     steps: List[HistoryStep]
+
 
 class WorkspaceResetRequest(NamedTuple):
     reason: str
     step_index: int | None
 
+
 class WorkspaceListResponse(NamedTuple):
     workspaces: List[WorkspaceDescriptor]
 
+
 class PathListResponse(NamedTuple):
     paths: List[str]
+
 
 class WorkspaceMoveFileRequest(NamedTuple):
     path_before: str
     path_after: str
 
+
 class WorkspaceFileContents(NamedTuple):
     path: str
     artifact_type: str
-    content: str
+    content: bytes
+
 
 class WorkspaceGetMultiRequest(NamedTuple):
     paths: List[str]
@@ -130,11 +147,13 @@ class WorkspaceSaveRequest(NamedTuple):
 class WorkspaceDeliverRequest(NamedTuple):
     description: str
 
+
 class WorkspaceIntegrateChangeRequest(NamedTuple):
     source_history: str
     changeName: str
 
+
 class WorkspaceIntegrateDiffRequest(NamedTuple):
     fromVersion: ProjectVersionSpecifier
     toVersion: ProjectVersionSpecifier
-    
+

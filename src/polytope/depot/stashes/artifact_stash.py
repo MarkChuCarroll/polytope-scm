@@ -12,20 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
+import copy
 from datetime import datetime
-from sqlite3.dbapi2 import Timestamp
-from typing import Any, Dict, List, Set, Tuple, assert_type
+from typing import Dict, List, Set, Tuple
 
 from polytope.common.error import ErrorKind, PtException
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion, VersionStatus
 from polytope.common.stashable.ids import Id, IdKind
 from polytope.common.stashable.user import Action, AuthenticatedUser
-from polytope.depot.config import Config
 from polytope.depot.depot import Depot
 from polytope.depot.stashes.stash import Stash
 from polytope.depot.stashes.user_stash import UserStash
-from polytope.depot.storage.storage import Content, Storage
+from polytope.depot.storage.storage import Content
 
 
 class ArtifactStash(Stash):
@@ -34,9 +32,7 @@ class ArtifactStash(Stash):
 
     """
 
-    def __init__(
-            self,
-            depot: Depot) -> None:
+    def __init__(self, depot: Depot) -> None:
         self.depot = depot
         self.artifacts = self.depot.db.get_collection("artifacts")
         self.versions = self.depot.db.get_collection("versions")
@@ -49,9 +45,9 @@ class ArtifactStash(Stash):
     def user_stash(self) -> UserStash:
         return self.depot.user_stash
 
-    def retrieve_artifact(self, auth:
-                          AuthenticatedUser,
-                          project: str, id: Id[Artifact]) -> Artifact:
+    def retrieve_artifact(
+        self, auth: AuthenticatedUser, project: str, id: Id[Artifact]
+    ) -> Artifact:
         """
         Retrieves an artifact from the database
 
@@ -60,7 +56,7 @@ class ArtifactStash(Stash):
         project -- the project containing the artifact.
         id -- the artifact ID.
 
-        returns  the full Artifact record.
+        Returns  the full Artifact record.
         """
         self.user_stash.validate_permissions(auth, Action.read_project(project))
         art_dict = self.artifacts.find_one({"_id": str(id), "project": project})
@@ -70,11 +66,10 @@ class ArtifactStash(Stash):
 
     def retrieve_version(
         self,
-        auth:
-        AuthenticatedUser,
+        auth: AuthenticatedUser,
         project: str,
         art_id: Id[Artifact],
-        ver_id: Id[ArtifactVersion]
+        ver_id: Id[ArtifactVersion],
     ) -> ArtifactVersion:
         """
         Retrieve a version of an artifact from the database.
@@ -88,24 +83,25 @@ class ArtifactStash(Stash):
         Returns the full ArtifactVersion record.
         """
         self.user_stash.validate_permissions(auth, Action.read_project(project))
-        ver_dict = self.versions.find_one({"_id": str(ver_id),
-                                           "artifact_id": str(art_id)})
+        ver_dict = self.versions.find_one({"_id": str(ver_id)})
         if ver_dict is None:
-            raise PtException(ErrorKind.NotFound,
-                              f"Artifact Version {ver_id} not found")
+            raise PtException(
+                ErrorKind.NotFound, f"Artifact Version {ver_id} not found"
+            )
 
-        return ArtifactVersion.from_dict(ver_dict)
+        result = ArtifactVersion.from_dict(ver_dict)
+        if result.artifact_id != art_id:
+            raise PtException(ErrorKind.Internal, "Whazza?")
+        return result
 
-    def create_artifact(self,
-                        auth:
-                            AuthenticatedUser,
-                        project: str,
-                        art_type:
-                            str,
-                        initial_content_id: Id[Content],
-                        metadata:
-                            Dict[str, str]
-                        ) -> Tuple[Artifact, ArtifactVersion]:
+    def create_artifact(
+        self,
+        auth: AuthenticatedUser,
+        project: str,
+        art_type: str,
+        initial_content_id: Id[Content],
+        metadata: Dict[str, str],
+    ) -> Tuple[Artifact, ArtifactVersion]:
         """
         Store a new artifact from the database.
 
@@ -119,6 +115,8 @@ class ArtifactStash(Stash):
         Throws PtException if the artifact already exists, if the user
         doesn't have permission to write it, or if there's some internal
         error storing it.
+
+        Returns a tuple containing the new artifact, and its initial version.
         """
         self.user_stash.validate_permissions(auth, Action.write_project(project))
         artId: Id[Artifact] = Id.new_id(IdKind.ID_ARTIFACT)
@@ -132,7 +130,8 @@ class ArtifactStash(Stash):
             content_id=initial_content_id,
             parents=[],
             metadata=metadata,
-            status=VersionStatus.Committed)
+            status=VersionStatus.Committed,
+        )
 
         artifact = Artifact(
             id=artId,
@@ -141,7 +140,7 @@ class ArtifactStash(Stash):
             creator=auth.user_id,
             project=project,
             metadata=metadata,
-            versions=[initial_version.id]
+            versions=[initial_version.id],
         )
         self.artifacts.insert_one(artifact.to_dict())
         self.versions.insert_one(initial_version.to_dict())
@@ -159,12 +158,14 @@ class ArtifactStash(Stash):
     ) -> ArtifactVersion:
         """
         Create a new version af an artifact
-        auth the authenticated user performing the operation
-        project the project containing the artifact.
-        artifact_id the ID of the artifact
-        content the content of the new artifact version.
-        parents a list of versions that will be parents of the new version.
-        metadata a map of metadata for the new version.
+
+        Arguments:
+        auth -- the authenticated user performing the operation
+        project -- the project containing the artifact.
+        artifact_id -- the ID of the artifact
+        content -- the content of the new artifact version.
+        parents -- a list of versions that will be parents of the new version.
+        metadata -- a map of metadata for the new version.
 
         Returns the new version
         """
@@ -178,15 +179,14 @@ class ArtifactStash(Stash):
             parents=parents,
             metadata=metadata,
             artifact_type=art_type,
-            status=VersionStatus.Committed
+            status=VersionStatus.Committed,
         )
         versions = self.retrieve_artifact(auth, project, art_id).versions
         versions.append(ver.id)
         self.versions.insert_one(ver.to_dict())
-        self.artifacts.update_one({"_id": str(art_id)},
-                                  {"$set": {
-                                      "versions": [str(v) for v in versions]
-                                  }})
+        self.artifacts.update_one(
+            {"_id": str(art_id)}, {"$set": {"versions": [str(v) for v in versions]}}
+        )
 
         return ver
 
@@ -195,7 +195,7 @@ class ArtifactStash(Stash):
         auth: AuthenticatedUser,
         project: str,
         artifact_id: Id[Artifact],
-        base_ver: Id[ArtifactVersion]
+        base_ver: Id[ArtifactVersion],
     ) -> ArtifactVersion:
         """
         Creates a working version of an artifact for an in-progress change.
@@ -219,13 +219,12 @@ class ArtifactStash(Stash):
             timestamp=datetime.now(),
             metadata=base.metadata,
             parents=[base.id],
-            status=VersionStatus.Working
+            status=VersionStatus.Working,
         )
-        self.versions.insert_one(working)
-        self.artifacts.update_one({"_id": str(artifact_id)}, {
-            "$push": {
-                "versions": str(working.id)
-            }})
+        self.versions.insert_one(working.to_dict())
+        self.artifacts.update_one(
+            {"_id": str(artifact_id)}, {"$push": {"versions": str(working.id)}}
+        )
         return working
 
     def update_working_version(
@@ -236,7 +235,7 @@ class ArtifactStash(Stash):
         version_id: Id[ArtifactVersion],
         updated_content_id: Id[Content] | None,
         updated_metadata: Dict[str, str] | None,
-        updated_parents: List[Id[ArtifactVersion]] | None
+        updated_parents: List[Id[ArtifactVersion]] | None,
     ) -> ArtifactVersion:
         """
         Update a working version
@@ -255,27 +254,31 @@ class ArtifactStash(Stash):
         Returns the updated version.
         """
         self.user_stash.validate_permissions(auth, Action.write_project(project))
-        if updated_content_id is None and updated_metadata is None and updated_parents is None:
-            raise PtException(ErrorKind.Constraint,
-                              "Update must update something")
+        if (
+            updated_content_id is None
+            and updated_metadata is None
+            and updated_parents is None
+        ):
+            raise PtException(ErrorKind.Constraint, "Update must update something")
 
         ver = self.retrieve_version(auth, project, artifact_id, version_id)
         if ver.status != VersionStatus.Working:
-            raise PtException(ErrorKind.Constraint,
-                              "Can only update a working version")
+            raise PtException(ErrorKind.Constraint, "Can only update a working version")
 
         if updated_content_id is not None:
-            self.versions.update_one({"_id": version_id}, {
-                "$set": {"content_id": str(updated_content_id)}
-            })
+            self.versions.update_one(
+                {"_id": str(version_id)},
+                {"$set": {"content_id": str(updated_content_id)}},
+            )
         if updated_metadata is not None:
-            self.versions.update_one({"_id": version_id}, {
-                "$set": {"metadata": updated_metadata}
-            })
+            self.versions.update_one(
+                {"_id": version_id}, {"$set": {"metadata": updated_metadata}}
+            )
         if updated_parents is not None:
-            self.versions.update_one({"_id": str(version_id)}, {
-                "$set": {"parents": list(str(p) for p in updated_parents)}
-            })
+            self.versions.update_one(
+                {"_id": str(version_id)},
+                {"$set": {"parents": list(str(p) for p in updated_parents)}},
+            )
         return self.retrieve_version(auth, project, artifact_id, version_id)
 
     def commit_working_version(
@@ -283,7 +286,7 @@ class ArtifactStash(Stash):
         auth: AuthenticatedUser,
         project: str,
         artifact_id: Id[Artifact],
-        version_id: Id[ArtifactVersion]
+        version_id: Id[ArtifactVersion],
     ) -> None:
         """
         Commit a working version as a final, immutable version in
@@ -296,27 +299,31 @@ class ArtifactStash(Stash):
         version_id -- the ID of the working version to be committed.
         """
         self.user_stash.validate_permissions(auth, Action.write_project(project))
-        now = datetime.now()
         version = self.retrieve_version(auth, project, artifact_id, version_id)
-        if version.status != VersionStatus.Working.value:
-            raise PtException(ErrorKind.Constraint,
-                              "Can only commit a working version")
-        new_id = self.depot.storage.commit_transient(version.content_id)
-        version.content_id = new_id
+        if version.status != VersionStatus.Working:
+            raise PtException(ErrorKind.Constraint, "Can only commit a working version")
+        if version.content_id.kind == IdKind.ID_TRANSIENT:
+            new_id = self.depot.storage.commit_transient(version.content_id)
+        else:
+            new_id = version.content_id
+        version = copy.replace(version, content_id=new_id)
 
-        self.versions.update_one({"_id": str(version_id)}, {
-            "$set": {
-                "content_id": str(new_id),
-                "status": VersionStatus.Committed.value
-            }
-        })
+        self.versions.update_one(
+            {"_id": str(version_id)},
+            {
+                "$set": {
+                    "content_id": str(new_id),
+                    "status": VersionStatus.Committed.value,
+                }
+            },
+        )
 
     def abort_working_version(
         self,
         auth: AuthenticatedUser,
         project: str,
         art_id: Id[Artifact],
-        ver_id: Id[ArtifactVersion]
+        ver_id: Id[ArtifactVersion],
     ) -> None:
         """
         Abort an in-progress version, discarding its content
@@ -331,22 +338,19 @@ class ArtifactStash(Stash):
         self.user_stash.validate_permissions(auth, Action.write_project(project))
         version = self.retrieve_version(auth, project, art_id, ver_id)
         if version.status != VersionStatus.Working:
-            raise PtException(ErrorKind.Constraint,
-                              "Can only abort a working version"
-                              )
+            raise PtException(ErrorKind.Constraint, "Can only abort a working version")
         self.depot.storage.delete_transient(version.content_id)
-        self.versions.update_one({"_id": str(version.id)},
-                                 {"$set": {
-                                     "content_id": None,
-                                     "status": VersionStatus.Aborted
-                                 }})
+        self.versions.update_one(
+            {"_id": str(version.id)},
+            {"$set": {"content_id": None, "status": VersionStatus.Aborted}},
+        )
 
     def retrieve_version_status(
         self,
         auth: AuthenticatedUser,
         project: str,
         artifact_id: Id[Artifact],
-        version_id: Id[ArtifactVersion]
+        version_id: Id[ArtifactVersion],
     ) -> VersionStatus:
         """
         Check the status of a version.
@@ -364,8 +368,19 @@ class ArtifactStash(Stash):
         auth: AuthenticatedUser,
         project: str,
         art_id: Id[Artifact],
-        ver_id: Id[ArtifactVersion]
+        ver_id: Id[ArtifactVersion],
     ) -> List[Id[ArtifactVersion]]:
+        """
+        Retrieve the list of immediate parents of a version.
+
+        Arguments:
+        auth -- the authenticated user performing the operation.
+        project -- the name of the project containing the artifact.
+        art_id -- the Id of the artifact
+        ver_id -- the Id of the artifact version.
+
+        Returns a list of the version IDs of the parents of the version.
+        """
         art = self.retrieve_version(auth, project, art_id, ver_id)
         return art.parents
 
@@ -376,6 +391,18 @@ class ArtifactStash(Stash):
         art_id: Id[Artifact],
         ver_id: Id[ArtifactVersion],
     ) -> Set[Id[ArtifactVersion]]:
+        """
+        Compute the set of all transitive ancestors of a version.
+
+        Arguments:
+        auth -- the authenticated user performing the operation.
+        project -- the name of the project containing the artifact.
+        art_id -- the Id of the artifact
+        ver_id -- the id of the version.
+
+        Returns a set of all versions that are in the ancestry of the
+        target version.
+        """
         queue: List[Id[ArtifactVersion]] = []
         queue.append(ver_id)
         all_ancestors: Set[Id[ArtifactVersion]] = set()
@@ -389,11 +416,24 @@ class ArtifactStash(Stash):
 
     def version_is_ancestor(
         self,
-        auth: AuthenticatedUser, project: str,
+        auth: AuthenticatedUser,
+        project: str,
         artifact_id: Id[Artifact],
         maybe_ancestor: Id[ArtifactVersion],
-        maybe_descendant: Id[ArtifactVersion]
+        maybe_descendant: Id[ArtifactVersion],
     ) -> bool:
+        """
+        Determine whether a given artifact is an ancestor of a target artifact.
+
+        Arguments:
+        auth -- the authenticated user performing the operation.
+        project -- the name of the project containing the artifact.
+        artifact_id -- the ID of the artifact containing the versions.
+        maybe_ancestor -- the ID of the potential ancestor version.
+        maybe_descendant -- the ID of the target version.
+
+        Returns True if maybe_ancestor is a ancestor of maybe_descendant
+        """
         all_ancestors = self.all_ancestors(auth, project, artifact_id, maybe_descendant)
         return maybe_ancestor in all_ancestors
 
@@ -403,7 +443,7 @@ class ArtifactStash(Stash):
         project: str,
         artifact_id: Id[Artifact],
         src: Id[ArtifactVersion],
-        tgt: Id[ArtifactVersion]
+        tgt: Id[ArtifactVersion],
     ) -> Id[ArtifactVersion]:
         """
         Get the nearest common ancestor of two versions.
@@ -418,11 +458,15 @@ class ArtifactStash(Stash):
         the intersection are equally distance from the two versions, so we can arbitrarily
         choose any of them as a NCA.
 
-        auth --
-        project --
-        artifact_id --
-        src --
-        tgt --
+        auth -- the authenticated user performing the operation.
+        project -- the name of the project containing the artifact
+        artifact_id -- the id of the artifact
+        src -- one of the two target versions.
+        tgt -- the other target version.
+
+        Returns a nearest common ancestor of the source and target version. If there are
+        multiple ancestors at the same distance, then the result will be an arbitrary selection
+        from those common ancestors.
         """
         self.user_stash.validate_permissions(auth, Action.read_project(project))
         source_hist: Set[Id[ArtifactVersion]] = set()
@@ -431,7 +475,11 @@ class ArtifactStash(Stash):
         src_queue.append(src)
         tgt_queue: List[Id[ArtifactVersion]] = []
         tgt_queue.append(tgt)
-        while len(source_hist & target_hist) == 0 and len(src_queue) > 0 and len(tgt_queue) > 0:
+        while (
+            len(source_hist & target_hist) == 0
+            and len(src_queue) > 0
+            and len(tgt_queue) > 0
+        ):
             if len(src_queue) > 0:
                 nxt = src_queue.pop(0)
                 if nxt not in source_hist:
@@ -446,6 +494,8 @@ class ArtifactStash(Stash):
                         tgt_queue.append(p)
         ancestors = source_hist & target_hist
         if len(ancestors) == 0:
-            raise PtException(ErrorKind.Internal,
-                              "Two versions of an artifact have no common ancestor. This should be impossible")
+            raise PtException(
+                ErrorKind.Internal,
+                "Two versions of an artifact have no common ancestor. This should be impossible",
+            )
         return ancestors.pop()

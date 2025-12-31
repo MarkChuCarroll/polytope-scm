@@ -23,7 +23,7 @@ class ErrorKind(Enum):
     NotFound = (2,)  # error 2 (ENOENT)
     Conflict = (16,)  # error 16 (EBUSY)
     Authentication = (13,)  # Error 13 (EACCESS)
-    Parsing = (5,)  #  Error 5 (EIO)
+    Parsing = (5,)  # Error 5 (EIO)
     Constraint = (33,)  # Error 33 (EDOM)
     TypeError = (34,)  # Error 34 (ERANGE)
     UserError = (1,)  # Error 1(EPERM)
@@ -109,4 +109,5 @@ class PtException(Exception):
     def __init__(
         self, kind: ErrorKind, msg: str, cause: Exception | None = None
     ) -> None:
+        self.kind = kind
         super(PtException, self).__init__(kind.prefix() + msg, cause)

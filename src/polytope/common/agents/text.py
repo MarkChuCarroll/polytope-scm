@@ -14,11 +14,10 @@
 
 import base64
 from enum import Enum
-from io import BytesIO, StringIO
+from io import BytesIO
 import json
 import os
 import pickle
-from zipfile import Path
 
 from polytope.common.stashable.stashable import JDict
 from polytope.common.util import filetype
@@ -29,7 +28,6 @@ from polytope.common.util.filetype import FileType
 from polytope.common.agents.agents import FileAgent, MergeConflict, MergeResult
 from typing import Any, Dict, List, NamedTuple
 
-from polytope.depot.depot import Depot
 from polytope.depot.storage.storage import Storage
 
 

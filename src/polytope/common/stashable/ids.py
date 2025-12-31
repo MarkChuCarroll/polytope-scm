@@ -56,7 +56,6 @@ class Id[T]:
 
     @classmethod
     def from_string(cls, s: str) -> "Id[T]":
-        print(f"Decoding {s}")
         parts = s.split(":")
         if len(parts) != 2:
             raise PtException(ErrorKind.Parsing, f"Invalid ID string: {s}")

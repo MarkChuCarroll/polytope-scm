@@ -52,7 +52,7 @@ class Change(NamedTuple):
             "basis": self.basis.to_dict(),
             "save_points": [str(sp) for sp in self.save_points],
             "status": self.status.value,
-            "timestamp": self.timestamp
+            "timestamp": self.timestamp,
         }
 
     @classmethod
@@ -67,7 +67,8 @@ class Change(NamedTuple):
             history=dict["history"],
             basis=ProjectVersionSpecifier.from_dict(dict["basis"]),
             save_points=[Id.from_string(sp) for sp in dict["save_points"]],
-            status=ChangeStatus(dict["status"]))
+            status=ChangeStatus(dict["status"]),
+        )
 
     def __repr__(self) -> str:
         ts = str(self.timestamp)
@@ -82,36 +83,42 @@ class Change(NamedTuple):
 class SavePoint(NamedTuple):
     id: Id["SavePoint"]
     change_id: Id[Change]
+    idx: int
     creator: str
     description: str
     basis: ProjectVersionSpecifier
+
     baseline_version: Id[ArtifactVersion]
     modified_artifacts: List[Id[Artifact]]
     timestamp: datetime
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "id": str(self.id),
+            "_id": str(self.id),
             "change_id": str(self.change_id),
             "creator": self.creator,
+            "idx": self.idx,
             "description": self.description,
             "basis": self.basis.to_dict(),
             "baseline_version": str(self.baseline_version),
             "modified_artifacts": [str(aid) for aid in self.modified_artifacts],
-            "timestamp": self.timestamp
+            "timestamp": self.timestamp,
         }
 
     @classmethod
-    def from_dict(self, dict: Dict[str, Any]) -> "SavePoint":
-        return SavePoint(
-            id=Id.from_string(dict["id"]),
+    def from_dict(cls, dict: Dict[str, Any]) -> "SavePoint":
+        return cls(
+            id=Id.from_string(dict["_id"]),
             change_id=Id.from_string(dict["change_id"]),
+            idx=dict["idx"],
             creator=dict["creator"],
             description=dict["description"],
             basis=ProjectVersionSpecifier.from_dict(dict["basis"]),
             baseline_version=Id.from_string(dict["baseline_version"]),
-            modified_artifacts=[Id.from_string(ma) for ma in dict["modified_artifacts"]],
-            timestamp=dict["timestamp"]
+            modified_artifacts=[
+                Id.from_string(ma) for ma in dict["modified_artifacts"]
+            ],
+            timestamp=dict["timestamp"],
         )
 
     def __repr__(self) -> str:
