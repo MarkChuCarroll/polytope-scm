@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,6 +72,7 @@ class ProjectVersionSpecifier:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "type": "ProjectVersionSpecifier",
             "kind": self.kind.value,
             "project": self.project,
             "history": self.history,

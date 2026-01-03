@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ from enum import Enum
 from typing import Any, Dict, List, NamedTuple
 from polytope.common.stashable.ids import Id
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion
-import textwrap
 
 from polytope.common.stashable.pvs import ProjectVersionSpecifier
 
@@ -43,6 +42,7 @@ class Change(NamedTuple):
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "type": "Change",
             "_id": str(self.id),
             "project": self.project,
             "name": self.name,
@@ -70,15 +70,6 @@ class Change(NamedTuple):
             status=ChangeStatus(dict["status"]),
         )
 
-    def __repr__(self) -> str:
-        ts = str(self.timestamp)
-        return textwrap.dedent(f"""\
-            Change: {self.project}::{self.history}::{self.name} [Status: {self.status}
-            Description: {self.description}
-            Basis: ${self.basis}
-            Created at: {ts}
-            """)
-
 
 class SavePoint(NamedTuple):
     id: Id["SavePoint"]
@@ -94,6 +85,7 @@ class SavePoint(NamedTuple):
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "type": "SavePoint",
             "_id": str(self.id),
             "change_id": str(self.change_id),
             "creator": self.creator,
@@ -120,11 +112,3 @@ class SavePoint(NamedTuple):
             ],
             timestamp=dict["timestamp"],
         )
-
-    def __repr__(self) -> str:
-        mods = ", ".join([str(s) for s in self.modified_artifacts])
-        return textwrap.dedent(f"""\
-            SavePoint: {self.id} [ {self.basis} ]
-            Created by: {self.creator} at {self.timestamp}
-            Changes: {mods}
-            """)

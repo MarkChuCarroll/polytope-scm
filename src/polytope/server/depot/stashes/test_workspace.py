@@ -1,5 +1,5 @@
 #
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,9 +24,9 @@ import pytest
 from polytope.common.agents.directory import Directory
 from polytope.common.agents.text import TextContent
 from polytope.common.stashable.user import Action, AuthenticatedUser
-from polytope.depot.config import Config
-from polytope.depot.depot import Depot
-from polytope.depot.storage.storage import FileStorage, Storage
+from polytope.server.depot.config import Config
+from polytope.server.depot import Depot
+from polytope.server.depot.storage import FileStorage, Storage
 
 
 class TestWorkspaceBasics:
@@ -46,6 +46,7 @@ class TestWorkspaceBasics:
             },
             "storage": {"storage_path": storage.dir},
             "db": {"connection_str": "mongodb://localhost:27017", "db_name": db_name},
+            "server": {"jwt_key": "polytope_test", "port": 21211},
         }
         d = Depot(cfg)
         yield d

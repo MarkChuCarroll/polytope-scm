@@ -1,10 +1,10 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#    http: // www.apache.org/licenses/LICENSE-2.0
+#    http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,18 +24,18 @@ from polytope.common.agents.baseline import (
     BaselineConflictType,
 )
 from polytope.common.agents.directory import Directory
-from polytope.common.api.requests import WorkspaceFileContents
+from polytope.common.api.workspace import WsFileContents
 from polytope.common.error import ErrorKind, PtException
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion
 from polytope.common.stashable.change import Change, ChangeStatus, SavePoint
 from polytope.common.stashable.ids import Id, IdKind
 from polytope.common.stashable.pvs import ProjectVersionSpecifier
-from polytope.common.stashable.stashable import JDict
+from polytope.common.stashable import JDict
 from polytope.common.stashable.user import Action, AuthenticatedUser
 from polytope.common.stashable.workspace import Workspace, WorkspaceDescriptor
-from polytope.depot.config import Config
-from polytope.depot.depot import Depot
-from polytope.depot.stashes.stash import Stash
+from polytope.server.depot.config import Config
+from polytope.server.depot import Depot
+from polytope.server.depot.stashes.stash import Stash
 
 
 class WorkspaceIndexKey:
@@ -373,8 +373,8 @@ class WorkspaceStash(Stash):
     def open_change(
         self,
         auth: AuthenticatedUser,
-        wsid: Id[Workspace],
         project: str,
+        wsid: Id[Workspace],
         history: str,
         change_name: str,
     ) -> Workspace:
@@ -492,7 +492,7 @@ class WorkspaceStash(Stash):
             art = self.depot.artifact_stash.retrieve_version(
                 auth, ws.project, art_id, cbl.entries[art_id]
             )
-            if art.artifact_type != "directory":
+            if art.artifact_type != "artifact":
                 raise PtException(
                     ErrorKind.NotFound, f"Invalid path {'/'.join(path_parts)}"
                 )
@@ -569,11 +569,11 @@ class WorkspaceStash(Stash):
             )
 
         if id not in ws.working_versions:
-            ver_id: Id[ArtifactVersion] | None
-            if id == ws.baseline_id:
-                ver_id = ws.baseline_version
-            else:
-                ver_id = self._current_baseline(auth, ws).get(id)
+            ver_id = (
+                ws.baseline_version
+                if id == ws.baseline_id
+                else self._current_baseline(auth, ws).get(id)
+            )
             if ver_id is None:
                 raise PtException(
                     ErrorKind.NotFound, f"artifact {id} not found in project baseline"
@@ -604,7 +604,7 @@ class WorkspaceStash(Stash):
                     updated_parents=None,
                     updated_metadata=None,
                 )
-                return working
+                return working_baseline_version
             else:
                 ws.baseline_version = working.id
                 self._update_stored_workspace(ws)
@@ -711,15 +711,14 @@ class WorkspaceStash(Stash):
 
         Arguments:
         auth -- the authenticated user performing the action.
-        project -- the project containing the workspace
         wsid -- the ID of workspace
+        project -- the project containing the workspace
         old_path -- the path to the file in the current workspace.
         new_path -- the path to move the file to.
         """
-        print(f"Moving {old_path} to {new_path}")
         self.depot.user_stash.validate_permissions(auth, Action.write_project(project))
         ws = self.retrieve_workspace_by_id(auth, project, wsid)
-        if ws.change is None:
+        if ws.change is not None:
             raise PtException(
                 ErrorKind.Constraint, "Artifacts can only be modified in an open change"
             )
@@ -735,7 +734,6 @@ class WorkspaceStash(Stash):
             new_name = old_name
 
         if "/".join(old_path_dir) == "/".join(new_path_dir):
-            print(f"Path ==: {old_path_dir}")
             old_dir_id = self._get_artifact_at_path(auth, ws, old_path_dir)
             working_dir_art = self._get_or_create_working_version(
                 auth, project, ws, old_dir_id
@@ -757,7 +755,6 @@ class WorkspaceStash(Stash):
                 updated_parents=None,
             )
         else:
-            print(f"Path !=: {new_path_dir}")
             src_dir_id = self._get_artifact_at_path(auth, ws, old_path_dir)
             tgt_dir_id = self._get_artifact_at_path(auth, ws, new_path_dir)
             working_src_dir_ver = self._get_or_create_working_version(
@@ -778,7 +775,7 @@ class WorkspaceStash(Stash):
             updated_src_dir = src_dir.copy()
             updated_src_dir.remove_binding(old_name)
             updated_tgt_dir = tgt_dir.copy()
-            updated_tgt_dir.add_binding(new_name, moved_id)
+            tgt_dir.add_Binding(new_name, moved_id)
             self.depot.artifact_stash.update_working_version(
                 auth=auth,
                 project=ws.project,
@@ -801,7 +798,6 @@ class WorkspaceStash(Stash):
                 updated_metadata=None,
                 updated_parents=None,
             )
-            self._update_stored_workspace(ws)
 
     def _add_transitive_contents_to_list(
         self,
@@ -811,7 +807,7 @@ class WorkspaceStash(Stash):
         result: Set[Id[Artifact]],
     ) -> None:
         baseline = self._current_baseline(auth, ws)
-        for name, id in dir.entries.items():
+        for _, id in dir.entries.items():
             result.add(id)
 
             ver_id = baseline.get(id)
@@ -959,7 +955,7 @@ class WorkspaceStash(Stash):
 
     def get_file_contents(
         self, auth: AuthenticatedUser, project: str, wsid: Id[Workspace], path: str
-    ) -> WorkspaceFileContents:
+    ) -> WsFileContents:
         """
         Get the contents of the artifact at a path.
 
@@ -981,7 +977,7 @@ class WorkspaceStash(Stash):
             id,
             self._assert_not_null(self._current_baseline(auth, ws).get(id)),
         )
-        return WorkspaceFileContents(
+        return WsFileContents(
             path, ver.artifact_type, self.depot.storage.get(ver.content_id)
         )
 
@@ -1022,7 +1018,6 @@ class WorkspaceStash(Stash):
         else:
             dir = dir_opt
 
-        print(f"Walking directory {dir}")
         for name, id in dir.entries.items():
             result.append(name)
             e_ver = self.depot.artifact_stash.retrieve_version(
@@ -1092,18 +1087,24 @@ class WorkspaceStash(Stash):
         self._update_stored_workspace(ws)
         return sp
 
-    def deliver(self, auth: AuthenticatedUser, ws: Workspace, description: str) -> None:
+    def deliver(
+        self,
+        auth: AuthenticatedUser,
+        project: str,
+        ws_id: Id[Workspace],
+        description: str,
+    ) -> None:
         """
         Deliver the current change to its history.
 
         Arguments:
         auth -- the authenticated user performing the action.
-        ws -- the workspace
+        project -- the project containing the workspace.
+        ws_id -- the workspace id
         description -- a description of the change.
         """
-        self.depot.user_stash.validate_permissions(
-            auth, Action.write_project(ws.project)
-        )
+        self.depot.user_stash.validate_permissions(auth, Action.write_project(project))
+        ws = self.retrieve_workspace_by_id(auth, project, ws_id)
         if len(ws.modified_artifacts) == 0:
             raise PtException(
                 ErrorKind.UserError,
@@ -1117,7 +1118,7 @@ class WorkspaceStash(Stash):
             )
         if ws.change is None:
             raise PtException(ErrorKind.UserError, "No change in progress to deliver")
-        if not self.up_to_date(auth, ws):
+        if not self.up_to_date(auth, project, ws.id):
             raise PtException(
                 ErrorKind.UserError,
                 f"History {ws.history} has steps that haven't been merged into your workspace; "
@@ -1144,9 +1145,13 @@ class WorkspaceStash(Stash):
         )
         self._update_stored_workspace(ws)
 
-    def up_to_date(self, auth: AuthenticatedUser, ws: Workspace) -> bool:
+    def up_to_date(
+        self, auth: AuthenticatedUser, project: str, wsid: Id[Workspace]
+    ) -> bool:
+        self.depot.user_stash.validate_permissions(auth, Action.read_project(project))
+        ws = self.retrieve_workspace_by_id(auth, project, wsid)
         top_of_history = self.depot.history_stash.retrieve_history_step(
-            auth, ws.project, ws.history
+            auth, project, ws.history
         )
         return self.depot.artifact_stash.version_is_ancestor(
             auth,
@@ -1290,7 +1295,8 @@ class WorkspaceStash(Stash):
     def integrate_change(
         self,
         auth: AuthenticatedUser,
-        ws: Workspace,
+        project: str,
+        wsid: Id[Workspace],
         change_source_history: str,
         change_name: str,
     ) -> List[MergeConflict]:
@@ -1300,15 +1306,15 @@ class WorkspaceStash(Stash):
 
         Arguments:
         auth -- the authenticated user performing the action.
+        project -- the name of the project
         ws -- the workspace
-        from -- the start point of the changes to integrate to this workspace.
-        to -- the target point of the changes to integrate to this workspace.
+        change_source_history -- the name of the history being integrated.
+        change_name -- the name of the change in the history.
 
         Returns a list of any merge conflicts created by the integration.
         """
-        self.depot.user_stash.validate_permissions(
-            auth, Action.write_project(ws.project)
-        )
+        self.depot.user_stash.validate_permissions(auth, Action.write_project(project))
+        ws = self.retrieve_workspace_by_id(auth, project, wsid)
         if len(ws.modified_artifacts) > 0:
             raise PtException(
                 ErrorKind.UserError,
@@ -1345,11 +1351,16 @@ class WorkspaceStash(Stash):
             )
         raise NotImplementedError()
 
-    def delete_workspace(self, auth: AuthenticatedUser, ws: Workspace) -> None:
-        self.depot.user_stash.validate_permissions(
-            auth, Action.write_project(ws.project)
-        )
-        self.workspaces.delete_one({"_id": str(ws.id)})
+    def delete_workspace(
+        self, auth: AuthenticatedUser, project: str, wsid: Id[Workspace]
+    ) -> None:
+        self.depot.user_stash.validate_permissions(auth, Action.write_project(project))
+        mod = self.workspaces.delete_one({"_id": str(wsid), "project": project})
+        if mod.deleted_count == 0:
+            raise PtException(
+                ErrorKind.NotFound,
+                f"Workspace {wsid} not found in project {project}",
+            )
 
     def abandon_changes(
         self, auth: AuthenticatedUser, project: str, wsid: Id[Workspace], reason: str

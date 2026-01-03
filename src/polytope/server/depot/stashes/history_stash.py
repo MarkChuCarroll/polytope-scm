@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,18 +16,18 @@ import copy
 from datetime import datetime
 from pymongo.synchronous.cursor import Cursor
 
-from typing import List, Tuple
+from typing import List
 from polytope.common.error import ErrorKind, PtException
 from polytope.common.stashable.artifact import ArtifactVersion
 from polytope.common.stashable.change import Change
 from polytope.common.stashable.history import History, HistoryStep
 from polytope.common.stashable.ids import Id, IdKind
 from polytope.common.stashable.pvs import PVSKind, ProjectVersionSpecifier
-from polytope.common.stashable.stashable import JDict
+from polytope.common.stashable import JDict
 from polytope.common.stashable.user import Action, AuthenticatedUser
-from polytope.depot.depot import Depot
-from polytope.depot.stashes.stash import Stash
-from polytope.depot.stashes.user_stash import UserStash
+from polytope.server.depot import Depot
+from polytope.server.depot.stashes.stash import Stash
+from polytope.server.depot.stashes.user_stash import UserStash
 
 INITIAL_HISTORY_NAME = "main"
 
@@ -237,7 +237,7 @@ class HistoryStash(Stash):
 
     def list_histories(
         self, auth: AuthenticatedUser, project: str
-    ) -> List[Tuple[str, str]]:
+    ) -> List[History]:
         """
         List the histories of a project
 
@@ -254,10 +254,7 @@ class HistoryStash(Stash):
             raise PtException(
                 ErrorKind.NotFound, f"No histories found for project {project}"
             )
-        result: List[Tuple[str, str]] = []
-        for h in histories:
-            result.append((h["name"], h["description"]))
-        return result
+        return list(History.from_dict(h) for h in histories)
 
     def create_initial_history(
         self,

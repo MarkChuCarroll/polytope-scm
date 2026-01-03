@@ -1,10 +1,10 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#    http: // www.apache.org/licenses/LICENSE-2.0
+#    http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,9 +26,9 @@ from polytope.common.stashable.user import (
     AuthenticatedUser,
     User,
 )
-from polytope.depot.config import Config
-from polytope.depot.depot import Depot
-from polytope.depot.stashes.stash import Stash
+from polytope.server.depot.config import Config
+from polytope.server.depot import Depot
+from polytope.server.depot.stashes.stash import Stash
 
 
 class Authentication(TypedDict):
@@ -263,3 +263,8 @@ class UserStash(Stash):
         if result.modified_count == 0:
             raise PtException(ErrorKind.NotFound, f"User {user_id} not found")
         return copy.replace(self.get_user(user_id), password="<redacted>")
+
+    def list_users(self, auth: AuthenticatedUser) -> List[str]:
+        self.validate_permissions(auth, Action.read_users())
+        users: List[User] = self.users.find({}).to_list()
+        return [u.user_id for u in users]

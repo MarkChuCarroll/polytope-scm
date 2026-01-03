@@ -1,10 +1,10 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#    http: // www.apache.org/licenses/LICENSE-2.0
+#    http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,11 +24,10 @@ from polytope.common.stashable.artifact import Artifact, ArtifactVersion
 from polytope.common.stashable.change import ChangeStatus
 from polytope.common.stashable.pvs import ProjectVersionSpecifier
 from polytope.common.stashable.user import Action
-from polytope.depot.config import Config
-from polytope.depot.depot import Depot
-from polytope.depot.stashes.user_stash import AuthenticatedUser
-from polytope.depot.storage.storage import Content, FileStorage, Storage
-
+from polytope.server.depot.config import Config
+from polytope.server.depot import Depot
+from polytope.server.depot.stashes.user_stash import AuthenticatedUser
+from polytope.server.depot.storage import Content, FileStorage
 
 class TestDepot:
     @pytest.fixture
@@ -47,6 +46,10 @@ class TestDepot:
             },
             "storage": {"storage_path": storage.dir},
             "db": {"connection_str": "mongodb://localhost:27017", "db_name": db_name},
+            "server": {
+                "jwt_key": "polytope_test",
+                "port": 21211,
+            }
         }
         d = Depot(cfg)
         yield d
