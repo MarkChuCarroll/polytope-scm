@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@
 # The record for an artifact in the depot
 from datetime import datetime
 from enum import Enum
-from typing import Any, NamedTuple, List, Dict, TypedDict
+from typing import NamedTuple, List, Dict
 from polytope.common.stashable.ids import Id
-from polytope.common.stashable.stashable import JDict, Stashable
-from polytope.depot.storage.storage import Content
+from polytope.common.stashable import JDict
+from polytope.server.depot.storage import Content
 
 
 class Artifact(NamedTuple):
@@ -40,18 +40,19 @@ class Artifact(NamedTuple):
             creator=d["creator"],
             project=d["project"],
             metadata=d["metadata"],
-            versions=list(Id.from_string(v) for v in d["versions"])
+            versions=list(Id.from_string(v) for v in d["versions"]),
         )
 
     def to_dict(self) -> JDict:
         return {
+            "type": "Artifact",
             "_id": str(self.id),
             "artifact_type": self.artifact_type,
             "timestamp": self.timestamp.isoformat(),
             "creator": self.creator,
             "project": self.project,
             "metadata": self.metadata,
-            "versions": [str(v) for v in self.versions]
+            "versions": [str(v) for v in self.versions],
         }
 
 
@@ -74,6 +75,7 @@ class ArtifactVersion(NamedTuple):
 
     def to_dict(self) -> JDict:
         return {
+            "type": "ArtifactVersion",
             "_id": str(self.id),
             "artifact_id": str(self.artifact_id),
             "artifact_type": self.artifact_type,
@@ -82,7 +84,7 @@ class ArtifactVersion(NamedTuple):
             "content_id": str(self.content_id),
             "parents": list(str(p) for p in self.parents),
             "metadata": self.metadata,
-            "status": self.status.value
+            "status": self.status.value,
         }
 
     @classmethod
@@ -96,5 +98,5 @@ class ArtifactVersion(NamedTuple):
             content_id=Id.from_string(d["content_id"]),
             parents=list(Id.from_string(i) for i in d["parents"]),
             metadata=d["metadata"],
-            status=VersionStatus(d["status"])
+            status=VersionStatus(d["status"]),
         )

@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,13 +24,11 @@
 # the auth token is genuine.
 
 from enum import Enum
-from math import perm
-import time
-from typing import Any, Dict, List, NamedTuple
+from typing import List, NamedTuple
 from datetime import datetime
 
 from polytope.common.error import ErrorKind, PtException
-from polytope.common.stashable.stashable import JDict
+from polytope.common.stashable import JDict
 
 
 class ActionLevel(Enum):
@@ -117,6 +115,7 @@ class Action(NamedTuple):
       the actions they're allowed to perform. Any action
       which is <= one of their permitted actions is allowed.
     """
+
     scope_type: ActionScopeType
     scope_name: str
     level: ActionLevel
@@ -130,7 +129,7 @@ class Action(NamedTuple):
             )
         )
 
-    def permitted_for(self, user: AuthenticatedUser) -> bool:
+    def permitted_for(self, user: "AuthenticatedUser") -> bool:
         permits = [
             user_permit
             for user_permit in user.permitted_actions
@@ -145,16 +144,19 @@ class Action(NamedTuple):
 
     def to_dict(self) -> JDict:
         return {
+            "type": "Action",
             "scope_type": self.scope_type.value,
             "scope_name": self.scope_name,
-            "level": self.level.value
+            "level": self.level.value,
         }
 
     @classmethod
-    def from_dict(cls, d: JDict) -> Action:
-        return cls(scope_type=ActionScopeType(d["scope_type"]),
-                   level=ActionLevel(d["level"]),
-                   scope_name=d["scope_name"])
+    def from_dict(cls, d: JDict) -> "Action":
+        return cls(
+            scope_type=ActionScopeType(d["scope_type"]),
+            level=ActionLevel(d["level"]),
+            scope_name=d["scope_name"],
+        )
 
     @classmethod
     def admin_users(cls) -> "Action":
@@ -226,17 +228,18 @@ class AuthenticatedUser(NamedTuple):
 
     def to_dict(self) -> JDict:
         return {
+            "type": "AuthenticatedUser",
             "_id": self.user_id,
             "auth_token": self.auth_token,
-            "permitted_actions": list(act.to_dict() for act in self.permitted_actions)
+            "permitted_actions": list(act.to_dict() for act in self.permitted_actions),
         }
 
     @classmethod
-    def from_dict(cls, d: JDict) -> AuthenticatedUser:
-        return AuthenticatedUser(
+    def from_dict(cls, d: JDict) -> "AuthenticatedUser":
+        return cls(
             user_id=d["_id"],
             auth_token=d["auth_token"],
-            permitted_actions=list(Action.from_dict(a) for a in d["permitted_actions"])
+            permitted_actions=list(Action.from_dict(a) for a in d["permitted_actions"]),
         )
 
 
@@ -257,9 +260,7 @@ class User(NamedTuple):
             "password": self.password,
             "timestamp": self.timestamp.isoformat(),
             "active": self.active if 1 else 0,
-            "permitted_actions": list(
-                p.to_dict() for p in self.permitted_actions
-            )
+            "permitted_actions": list(p.to_dict() for p in self.permitted_actions),
         }
 
     @classmethod
@@ -271,5 +272,5 @@ class User(NamedTuple):
             password=d["password"],
             timestamp=datetime.fromisoformat(d["timestamp"]),
             active=d["active"] != 0,
-            permitted_actions=list(Action.from_dict(a) for a in d["permitted_actions"])
+            permitted_actions=list(Action.from_dict(a) for a in d["permitted_actions"]),
         )

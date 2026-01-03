@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ from polytope.common.stashable.artifact import Artifact, ArtifactVersion
 from polytope.common.stashable.change import Change
 from polytope.common.stashable.ids import Id
 from polytope.common.stashable.pvs import ProjectVersionSpecifier
-from polytope.common.stashable.stashable import JDict
+from polytope.common.stashable import JDict
 
 
 class History(NamedTuple):
@@ -33,12 +33,13 @@ class History(NamedTuple):
 
     def to_dict(self) -> JDict:
         return {
+            "type": "History",
             "project": self.project,
             "name": self.name,
             "description": self.description,
             "timestamp": self.timestamp,
             "basis": self.basis.to_dict(),
-            "steps": [str(s) for s in self.steps]
+            "steps": [str(s) for s in self.steps],
         }
 
     @classmethod
@@ -49,7 +50,7 @@ class History(NamedTuple):
             description=dict["description"],
             timestamp=dict["timestamp"],
             basis=ProjectVersionSpecifier.from_dict(dict["basis"]),
-            steps=[Id.from_string(i) for i in dict["steps"]]
+            steps=[Id.from_string(i) for i in dict["steps"]],
         )
 
     def __repr__(self) -> str:
@@ -78,6 +79,7 @@ class HistoryStep(NamedTuple):
         else:
             change = str(self.change)
         return {
+            "type": "HistoryStep",
             "_id": str(self.id),
             "project": self.project,
             "change": change,
@@ -85,7 +87,7 @@ class HistoryStep(NamedTuple):
             "idx": self.idx,
             "baseline_id": str(self.baseline_id),
             "baseline_version_id": str(self.baseline_version_id),
-            "description": self.description
+            "description": self.description,
         }
 
     @classmethod
@@ -98,7 +100,7 @@ class HistoryStep(NamedTuple):
             idx=dict["idx"],
             baseline_id=Id.from_string(dict["baseline_id"]),
             baseline_version_id=Id.from_string(dict["baseline_version_id"]),
-            description=dict["description"]
+            description=dict["description"],
         )
 
     def __repr__(self) -> str:

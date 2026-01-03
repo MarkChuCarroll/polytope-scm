@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -80,29 +80,29 @@ class ErrorKind(Enum):
             return HTTPStatus.INTERNAL_SERVER_ERROR
 
     @classmethod
-    def from_status_code(cls, code: int) -> ErrorKind:
+    def from_status_code(cls, code: int) -> "ErrorKind":
         if code == HTTPStatus.INTERNAL_SERVER_ERROR.value:
-            return ErrorKind.Internal
+            return cls.Internal
         elif code == HTTPStatus.BAD_REQUEST.value:
-            return ErrorKind.InvalidParameter
+            return cls.InvalidParameter
         elif code == HTTPStatus.FORBIDDEN.value:
-            return ErrorKind.Permission
+            return cls.Permission
         elif code == HTTPStatus.NOT_FOUND.value:
-            return ErrorKind.NotFound
+            return cls.NotFound
         elif code == HTTPStatus.CONFLICT.value:
-            return ErrorKind.Conflict
+            return cls.Conflict
         elif code == HTTPStatus.UNAUTHORIZED.value:
-            return ErrorKind.Authentication
+            return cls.Authentication
         elif code == HTTPStatus.PRECONDITION_FAILED.value:
-            return ErrorKind.Constraint
+            return cls.Constraint
         elif code == HTTPStatus.UNPROCESSABLE_CONTENT.value:
-            return ErrorKind.Parsing
+            return cls.Parsing
         elif code == HTTPStatus.EXPECTATION_FAILED.value:
-            return ErrorKind.TypeError
+            return cls.TypeError
         elif code == HTTPStatus.NOT_ACCEPTABLE.value:
-            return ErrorKind.UserError
+            return cls.UserError
         else:
-            return ErrorKind.Internal
+            return cls.Internal
 
 
 class PtException(Exception):

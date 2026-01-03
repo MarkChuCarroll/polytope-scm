@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,9 +17,8 @@ import textwrap
 from typing import List, NamedTuple
 
 from polytope.common.stashable.artifact import Artifact
-from polytope.common.stashable.history import History
 from polytope.common.stashable.ids import Id
-from polytope.common.stashable.stashable import JDict
+from polytope.common.stashable import JDict
 
 
 class Project(NamedTuple):
@@ -33,25 +32,26 @@ class Project(NamedTuple):
 
     def to_dict(self) -> JDict:
         return {
+            "type": "Project",
             "name": self.name,
             "creator": self.creator,
             "timestamp": self.timestamp,
             "description": self.description,
             "root_dir": str(self.root_dir),
             "baseline": str(self.baseline),
-            "histories": self.histories
+            "histories": self.histories,
         }
 
     @classmethod
-    def from_dict(self, dict: JDict) -> "Project":
-        return Project(
+    def from_dict(cls, dict: JDict) -> "Project":
+        return cls(
             name=dict["name"],
             creator=dict["creator"],
             timestamp=dict["timestamp"],
             description=dict["description"],
             root_dir=Id.from_string(dict["root_dir"]),
             baseline=Id.from_string(dict["baseline"]),
-            histories=dict["histories"]
+            histories=dict["histories"],
         )
 
     def __repr__(self):

@@ -1,0 +1,10 @@
+{
+    "user": {
+        "root_user": "root",
+        "root_email": "root@root.root",
+        "password": "rootable"
+    },
+    "storage": {"storage_path": "./tmp/storage" },
+    "db": {"connection_str": "mongodb://localhost:27017", "db_name": "nexttest"},
+    "server": {"jwt_key": "polytope_test", "port": 21211}
+}

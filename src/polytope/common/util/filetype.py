@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,10 +36,12 @@ class FileType(Enum):
     text = "text"
     binary = "binary"
 
+
 def of(p: str) -> FileType:
     with open(p, "rb") as f:
         bytes = f.read(1024)
         return of_prefix(bytes)
+
 
 def of_prefix(bytes: bytes) -> FileType:
     for b in bytes:

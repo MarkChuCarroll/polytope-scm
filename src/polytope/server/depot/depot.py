@@ -1,10 +1,10 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#    http: // www.apache.org/licenses/LICENSE-2.0
+#    http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,8 @@
 from typing import TYPE_CHECKING, List
 from pymongo import MongoClient
 
-from polytope.depot.config import Config
-from polytope.depot.storage.storage import FileStorage
+from polytope.server.depot.config import Config
+from polytope.server.depot.storage import FileStorage
 
 if TYPE_CHECKING:
     from polytope.common.agents.agents import Agent
@@ -31,12 +31,12 @@ class Depot:
         self.db = self.mongo.get_database(config["db"]["db_name"])
 
         self.storage = FileStorage(config["storage"]["storage_path"])
-        from polytope.depot.stashes.artifact_stash import ArtifactStash
-        from polytope.depot.stashes.change_stash import ChangeStash
-        from polytope.depot.stashes.history_stash import HistoryStash
-        from polytope.depot.stashes.project_stash import ProjectStash
-        from polytope.depot.stashes.user_stash import UserStash
-        from polytope.depot.stashes.workspace_stash import WorkspaceStash
+        from polytope.server.depot.stashes.artifact_stash import ArtifactStash
+        from polytope.server.depot.stashes.change_stash import ChangeStash
+        from polytope.server.depot.stashes.history_stash import HistoryStash
+        from polytope.server.depot.stashes.project_stash import ProjectStash
+        from polytope.server.depot.stashes.user_stash import UserStash
+        from polytope.server.depot.stashes.workspace_stash import WorkspaceStash
 
         from polytope.common.agents.directory import DirectoryAgent
         from polytope.common.agents.baseline import BaselineAgent

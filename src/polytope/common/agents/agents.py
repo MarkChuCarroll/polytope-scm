@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from abc import abstractmethod, ABC
 import base64
 import hashlib
@@ -20,8 +19,8 @@ import textwrap
 from typing import List, NamedTuple
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion
 from polytope.common.stashable.ids import Id
-from polytope.common.stashable.stashable import JDict
-from polytope.depot.storage.storage import Storage
+from polytope.common.stashable import JDict
+from polytope.server.depot.storage import Storage
 
 
 class MergeConflict(NamedTuple):
@@ -42,12 +41,13 @@ class MergeConflict(NamedTuple):
 
     def to_dict(self) -> JDict:
         return {
+            "type": "MergeConflict",
             "_id": str(self.id),
             "artifact_id": str(self.artifact_id),
             "artifact_type": str(self.artifact_type),
             "source_version": str(self.source_version),
             "target_version": str(self.target_version),
-            "details": base64.b64encode(self.details)
+            "details": base64.b64encode(self.details),
         }
 
     @classmethod
@@ -58,7 +58,7 @@ class MergeConflict(NamedTuple):
             artifact_type=d["artifact_type"],
             source_version=Id.from_string(d["source_version"]),
             target_version=Id.from_string(d["target_version"]),
-            details=base64.b64decode(d["details"])
+            details=base64.b64decode(d["details"]),
         )
 
 
@@ -73,13 +73,14 @@ class MergeResult(NamedTuple):
 
     def to_dict(self) -> JDict:
         return {
+            "type": "MergeResult",
             "artifact_type": self.artifact_type,
             "artifact_id": str(self.artifact_id),
             "ancestor_version": str(self.ancestor_version),
             "source_version": str(self.source_version),
             "target_version": str(self.target_version),
             "proposed_merge": base64.b16encode(self.proposed_merge),
-            "conflicts": list(l.to_dict() for l in self.conflicts)
+            "conflicts": list(con.to_dict() for con in self.conflicts),
         }
 
     @classmethod
@@ -91,7 +92,7 @@ class MergeResult(NamedTuple):
             source_version=Id.from_string(d["source_version"]),
             target_version=Id.from_string(d["target_version"]),
             proposed_merge=base64.b64decode(d["proposed_merge"]),
-            conflicts=list(MergeConflict.from_dict(mc) for mc in d["conflicts"])
+            conflicts=list(MergeConflict.from_dict(mc) for mc in d["conflicts"]),
         )
 
 
@@ -124,13 +125,13 @@ class Agent[T](ABC):
 
 
 class FileAgent[T](Agent[T]):
-    def __init(self, storage: Storage) -> None:
+    def __init__(self, storage: Storage) -> None:
         super().__init__(storage)
 
     # Given a reference to a file, return "true" if the file is a type that
     # can be processed by the agent.
     @abstractmethod
-    def can_handle(self, file: str) -> bool: ...
+    def can_handle(self, path: str) -> bool: ...
 
     @abstractmethod
     def read_from_disk(self, path: str) -> T: ...

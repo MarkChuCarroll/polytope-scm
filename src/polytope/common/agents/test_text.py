@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ from polytope.common.agents.text import (
 )
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion, VersionStatus
 from polytope.common.stashable.ids import Id, IdKind
-from polytope.depot.storage.storage import Content, FileStorage, Storage
+from polytope.server.depot.storage import FileStorage, Storage
 
 
 class TestTextAgent:

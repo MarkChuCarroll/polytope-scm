@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,10 +17,10 @@ from datetime import datetime
 from typing import Dict, List, NamedTuple, Set
 
 from polytope.common.agents.agents import MergeConflict
+from polytope.common.stashable import JDict
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion
 from polytope.common.stashable.ids import Id
 from polytope.common.stashable.pvs import ProjectVersionSpecifier
-from polytope.common.stashable.stashable import JDict
 
 
 class WorkspaceDescriptor(NamedTuple):
@@ -34,6 +34,7 @@ class WorkspaceDescriptor(NamedTuple):
 
     def to_dict(self) -> JDict:
         return {
+            "type": "WorkspaceDescriptor",
             "_id": str(self.id),
             "ws_name": self.ws_name,
             "project": self.project,
@@ -93,6 +94,7 @@ class Workspace:
 
     def to_dict(self) -> JDict:
         return {
+            "type": "Workspace",
             "_id": str(self.id),
             "project": self.project,
             "name": self.name,

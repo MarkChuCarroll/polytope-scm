@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,23 +18,24 @@ from io import BytesIO
 import json
 import os
 import pickle
+from typing import Any, Dict, List, NamedTuple
 
-from polytope.common.stashable.stashable import JDict
+
+from polytope.common.stashable import JDict
 from polytope.common.util import filetype
 from polytope.common.util.lcs import CrossVersionLineMapping, indexed_lcs
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion
 from polytope.common.stashable.ids import Id, IdKind
 from polytope.common.util.filetype import FileType
 from polytope.common.agents.agents import FileAgent, MergeConflict, MergeResult
-from typing import Any, Dict, List, NamedTuple
-
-from polytope.depot.storage.storage import Storage
+from polytope.server.depot.storage import Storage
 
 
 class TextContent:
     """
     The representation of the content of text artifacts in Polytope.
     """
+
     lines: List[str]
 
     def __init__(self, lines: List[str]) -> None:
@@ -70,9 +71,27 @@ class TextAgent(FileAgent[TextContent]):
     def __init__(self, storage: Storage):
         super().__init__(storage)
         # A set of file extensions that this agent can handle.
-        self.extensions = set([".txt", ".java", ".kt", ".js", ".ts", ".json",
-                               ".rs", ".py", ".rb", ".ltx", ".tex", ".md",
-                               ".yaml", ".c", ".cc", "h", ".cpp"])
+        self.extensions = set(
+            [
+                ".txt",
+                ".java",
+                ".kt",
+                ".js",
+                ".ts",
+                ".json",
+                ".rs",
+                ".py",
+                ".rb",
+                ".ltx",
+                ".tex",
+                ".md",
+                ".yaml",
+                ".c",
+                ".cc",
+                "h",
+                ".cpp",
+            ]
+        )
 
     def can_handle(self, path: str) -> bool:
         (_, ext) = os.path.splitext(path)
@@ -90,20 +109,21 @@ class TextAgent(FileAgent[TextContent]):
     def artifact_type(self) -> str:
         return "text"
 
-     # Convert a text content to an array of bytes.
+    # Convert a text content to an array of bytes.
 
     def encode_to_bytes(self, content: TextContent) -> bytes:
         return "".join(content.lines).encode()
 
     def decode_from_bytes(self, content: bytes) -> TextContent:
         inp = BytesIO(content)
-        return TextContent([l.decode() for l in inp.readlines()])
+        return TextContent([line.decode() for line in inp.readlines()])
 
-    def merge(self,
-              ancestor: ArtifactVersion,
-              source: ArtifactVersion,
-              target: ArtifactVersion
-              ) -> MergeResult:
+    def merge(
+        self,
+        ancestor: ArtifactVersion,
+        source: ArtifactVersion,
+        target: ArtifactVersion,
+    ) -> MergeResult:
         anc_content = self.storage.get(ancestor.content_id)
         src_content = self.storage.get(source.content_id)
         tgt_content = self.storage.get(target.content_id)
@@ -114,13 +134,14 @@ class TextAgent(FileAgent[TextContent]):
             target.id,
             self.decode_from_bytes(anc_content),
             self.decode_from_bytes(src_content),
-            self.decode_from_bytes(tgt_content)
+            self.decode_from_bytes(tgt_content),
         )
 
-    def coalesce_lines_to_blocks(self,
-                                 src_labeled_lines: List[LabeledLine],
-                                 tgt_labeled_lines: List[LabeledLine]) -> List[MergeBlock]:
-
+    def coalesce_lines_to_blocks(
+        self,
+        src_labeled_lines: "List[LabeledLine]",
+        tgt_labeled_lines: "List[LabeledLine]",
+    ) -> "List[MergeBlock]":
         # A map from a line number in the base to a collection of lines that occur
         # before that line number in one of the mods. The anchor line of a block
         # is the line number of that block in the merge ancestor.
@@ -149,13 +170,15 @@ class TextAgent(FileAgent[TextContent]):
                 result.append(x)
         return result
 
-     # To label a modified version of a file, we'll walk through
-     # the lines in the base and the modified.
-     #
-     # * If a line is in the LCS(base, mod), then that line is Unmodified.
-     # * If a line is in the base, and _not_ in the modified then it's Deleted.
-     # * If a line is in the modified but not the base, then it's Inserted.
-    def create_labeled_list(self, base: List[str], modified: List[str]) -> List[LabeledLine]:
+    # To label a modified version of a file, we'll walk through
+    # the lines in the base and the modified.
+    #
+    # * If a line is in the LCS(base, mod), then that line is Unmodified.
+    # * If a line is in the base, and _not_ in the modified then it's Deleted.
+    # * If a line is in the modified but not the base, then it's Inserted.
+    def create_labeled_list(
+        self, base: List[str], modified: List[str]
+    ) -> "List[LabeledLine]":
         lcs: List[CrossVersionLineMapping] = indexed_lcs(base, modified)
         result: List[LabeledLine] = []
         first_unprocessed_in_base = 0
@@ -164,30 +187,38 @@ class TextAgent(FileAgent[TextContent]):
             if line.line_number_in_left > first_unprocessed_in_base:
                 # Lines between firstUnprocessedInBase and line.first (the start of the LCS
                 # segment's position in the base) were deleted before the start of the segment.
-                for l in range(first_unprocessed_in_base, line.line_number_in_left):
+                for ln in range(first_unprocessed_in_base, line.line_number_in_left):
                     result.append(
                         LabeledLine(
-                            LineLabel.Deleted, base[l], l, None,
-                            line.line_number_in_left
+                            LineLabel.Deleted,
+                            base[ln],
+                            ln,
+                            None,
+                            line.line_number_in_left,
                         )
                     )
             if line.line_number_in_right > first_unprocessed_in_target:
-                # Any lines from the target between firstUnprocessedInTarget and line.second (the start of the
-                # next LCS segment in mod) should be labeled as inserted
-                # before line.first
-                for l in range(first_unprocessed_in_target, line.line_number_in_right):
+                # Any lines from the target between firstUnprocessedInTarget and
+                # line.second (the start of the next LCS segment in mod) should be
+                # labeled as inserted before line.first
+                for ln in range(first_unprocessed_in_target, line.line_number_in_right):
                     result.append(
                         LabeledLine(
-                            LineLabel.Inserted, modified[l], None, l,
-                            line.line_number_in_left
+                            LineLabel.Inserted,
+                            modified[ln],
+                            None,
+                            ln,
+                            line.line_number_in_left,
                         )
                     )
             # Line from LCS should be labeled as unmodified.
             result.append(
                 LabeledLine(
-                    LineLabel.Unmodified, base[line.line_number_in_left],
-                    line.line_number_in_left, line.line_number_in_right,
-                    line.line_number_in_left + 1
+                    LineLabel.Unmodified,
+                    base[line.line_number_in_left],
+                    line.line_number_in_left,
+                    line.line_number_in_right,
+                    line.line_number_in_left + 1,
                 )
             )
             first_unprocessed_in_base = line.line_number_in_left + 1
@@ -195,12 +226,18 @@ class TextAgent(FileAgent[TextContent]):
 
         # Anything left over in base is a deleted line;
         for baseline in range(first_unprocessed_in_base, len(base)):
-            result.append(LabeledLine(LineLabel.Deleted,
-                          base[baseline], baseline, None, baseline + 1))
+            result.append(
+                LabeledLine(
+                    LineLabel.Deleted, base[baseline], baseline, None, baseline + 1
+                )
+            )
         # anything left over in the mod is an insert.
         for tgtline in range(first_unprocessed_in_target, len(modified)):
-            result.append(LabeledLine(LineLabel.Inserted,
-                          modified[tgtline], None, tgtline, tgtline + 1))
+            result.append(
+                LabeledLine(
+                    LineLabel.Inserted, modified[tgtline], None, tgtline, tgtline + 1
+                )
+            )
         return result
 
     def do_merge(
@@ -211,10 +248,14 @@ class TextAgent(FileAgent[TextContent]):
         target_version_id: Id[ArtifactVersion],
         base: TextContent,
         merge_src: TextContent,
-        merge_tgt: TextContent
+        merge_tgt: TextContent,
     ) -> MergeResult:
-        lab_src: List[LabeledLine] = self.create_labeled_list(base.lines, merge_src.lines)
-        lab_tgt: List[LabeledLine] = self.create_labeled_list(base.lines, merge_tgt.lines)
+        lab_src: List[LabeledLine] = self.create_labeled_list(
+            base.lines, merge_src.lines
+        )
+        lab_tgt: List[LabeledLine] = self.create_labeled_list(
+            base.lines, merge_tgt.lines
+        )
         blocks: List[MergeBlock] = self.coalesce_lines_to_blocks(lab_src, lab_tgt)
 
         result: List[str] = []
@@ -226,7 +267,7 @@ class TextAgent(FileAgent[TextContent]):
                 artifact_id=artifact_id,
                 source_version_id=source_version_id,
                 target_version_id=target_version_id,
-                result=result
+                result=result,
             )
 
         return MergeResult(
@@ -236,7 +277,8 @@ class TextAgent(FileAgent[TextContent]):
             source_version=source_version_id,
             target_version=target_version_id,
             proposed_merge=self.encode_to_bytes(TextContent(result)),
-            conflicts=all_conflicts)
+            conflicts=all_conflicts,
+        )
 
 
 class LineLabel(Enum):
@@ -244,7 +286,8 @@ class LineLabel(Enum):
     Inserted = "i"
     Unmodified = "u"
 
- # Lines labelled with information about how they differ from a base version.
+
+# Lines labelled with information about how they differ from a base version.
 
 
 class LabeledLine(NamedTuple):
@@ -260,30 +303,38 @@ class LabeledLine(NamedTuple):
             "content": self.content,
             "base_line": self.base_line,
             "target_line": self.target_line,
-            "anchor_line": self.anchor_line
+            "anchor_line": self.anchor_line,
         }
 
     def __repr__(self) -> str:
-        return f"LabeledLine({self.label}, {self.content}, {self.base_line}, {self.target_line}, {self.anchor_line})"
+        return (
+            f"LabeledLine({self.label}, "
+            + f"{self.content}, {self.base_line}, "
+            + f"{self.target_line}, {self.anchor_line})"
+        )
 
- # Check if two labeled lines match.
- # Matching means that the two correspond to an equivalent edit:
- # * deleting the same line;
- # * inserting the same text in the same position;
- # * leaving the same text unmodified.
+
+# Check if two labeled lines match.
+# Matching means that the two correspond to an equivalent edit:
+# * deleting the same line;
+# * inserting the same text in the same position;
+# * leaving the same text unmodified.
 
 
 def lines_match(first: LabeledLine, second: LabeledLine) -> bool:
-    return (second.label == first.label and
-            second.base_line == first.base_line and
-            second.anchor_line == first.anchor_line and
-            second.content == first.content)
+    return (
+        second.label == first.label
+        and second.base_line == first.base_line
+        and second.anchor_line == first.anchor_line
+        and second.content == first.content
+    )
 
- # A representation of a block of modified text from two different edits.
- # A block is anchored by a line of text from the original document which comes before
- # the edits. (This has the somewhat confusing effect that a file with 10 lines will have 11
- # indices - index[10] means "before the invisible line at the end of the file")
- # /
+
+# A representation of a block of modified text from two different edits.
+# A block is anchored by a line of text from the original document which comes before
+# the edits. (This has the somewhat confusing effect that a file with 10 lines will have 11
+# indices - index[10] means "before the invisible line at the end of the file")
+# /
 
 
 class MergeBlock:
@@ -291,9 +342,13 @@ class MergeBlock:
     src_lines: List[LabeledLine]
     tgt_lines: List[LabeledLine]
 
-    def __init__(self, l: int, src_lines: List[LabeledLine] | None = None,
-                 tgt_lines: List[LabeledLine] | None = None) -> None:
-        self.anchor_line = l
+    def __init__(
+        self,
+        ln: int,
+        src_lines: List[LabeledLine] | None = None,
+        tgt_lines: List[LabeledLine] | None = None,
+    ) -> None:
+        self.anchor_line = ln
         if src_lines is None:
             self.src_lines = []
         else:
@@ -307,18 +362,22 @@ class MergeBlock:
         return {
             "anchor_line": self.anchor_line,
             "src_lines": [j.to_dict() for j in self.src_lines],
-            "tgt_lines": [j.to_dict() for j in self.tgt_lines]
+            "tgt_lines": [j.to_dict() for j in self.tgt_lines],
         }
 
     def __repr__(self) -> str:
-        return f"MergeBlock({self.anchor_line}, src_lines={self.src_lines}, tgt_lines={self.tgt_lines})"
+        return (
+            f"MergeBlock({self.anchor_line}, "
+            + f"src_lines={self.src_lines}, tgt_lines={self.tgt_lines})"
+        )
 
-     # Checks if the two branches of a merge block correspond to the same edit.
+    # Checks if the two branches of a merge block correspond to the same edit.
     def matches(self) -> bool:
-        return (len(self.src_lines) == len(self.tgt_lines) and
-                all([lines_match(a, b) for (a, b) in zip(self.src_lines, self.tgt_lines)]))
+        return len(self.src_lines) == len(self.tgt_lines) and all(
+            [lines_match(a, b) for (a, b) in zip(self.src_lines, self.tgt_lines)]
+        )
 
-     # Generate the merge result of the labeled lines anchored at this point.
+    # Generate the merge result of the labeled lines anchored at this point.
     def render(
         self,
         source_label: str,
@@ -326,38 +385,41 @@ class MergeBlock:
         artifact_id: Id[Artifact],
         source_version_id: Id[ArtifactVersion],
         target_version_id: Id[ArtifactVersion],
-        result: List[str]
+        result: List[str],
     ) -> List[MergeConflict]:
         conflicts: List[MergeConflict] = []
         if self.matches():
             # If the two blocks match - that is, they generate to the same edit -
             # then we just return either one of them.
-            for l in self.src_lines:
-                if l.label == LineLabel.Inserted or l.label == LineLabel.Unmodified:
-                    result.append(l.content)
-        elif all([l.label == LineLabel.Unmodified for l in self.tgt_lines]):
+            for ln in self.src_lines:
+                if ln.label == LineLabel.Inserted or ln.label == LineLabel.Unmodified:
+                    result.append(ln.content)
+        elif all([ln.label == LineLabel.Unmodified for ln in self.tgt_lines]):
             # If all the target lines are unmodified, then the merge result is
             # the lines from the merge source.
-            for l in self.src_lines:
-                if l.label == LineLabel.Inserted or l.label == LineLabel.Unmodified:
-                    result.append(l.content)
-        elif all([l.label == LineLabel.Unmodified for l in self.src_lines]):
+            for ln in self.src_lines:
+                if ln.label == LineLabel.Inserted or ln.label == LineLabel.Unmodified:
+                    result.append(ln.content)
+        elif all([ln.label == LineLabel.Unmodified for ln in self.src_lines]):
             #  Similarly, if the source lines are unmodified, then the merge result
             # is the lines from the target.
-            for l in self.tgt_lines:
-                if l.label == LineLabel.Inserted or l.label == LineLabel.Unmodified:
-                    result.append(l.content)
+            for ln in self.tgt_lines:
+                if ln.label == LineLabel.Inserted or ln.label == LineLabel.Unmodified:
+                    result.append(ln.content)
         else:
             # Otherwise, we have a conflict between the source and target.
             conflict_block_start = len(result)
             result.append(f"[[[[[[ VERSION FROM {source_label}\n")
-            for l in self.src_lines:
-                if l.label == LineLabel.Inserted or l.label == LineLabel.Unmodified:
-                    result.append(l.content)
+            for ln in self.src_lines:
+                if ln.label == LineLabel.Inserted or ln.label == LineLabel.Unmodified:
+                    result.append(ln.content)
                 result.append(f"====== VERSION FROM {target_label}\n")
-                for l in self.tgt_lines:
-                    if l.label == LineLabel.Inserted or l.label == LineLabel.Unmodified:
-                        result.append(l.content)
+                for ln in self.tgt_lines:
+                    if (
+                        ln.label == LineLabel.Inserted
+                        or ln.label == LineLabel.Unmodified
+                    ):
+                        result.append(ln.content)
                 result.append("]]]]]]\n")
                 conflict_block_end = len(result)
                 conflicts.append(
@@ -367,6 +429,16 @@ class MergeBlock:
                         artifact_type="text",
                         source_version=source_version_id,
                         target_version=target_version_id,
-                        details=base64.b64encode(pickle.dumps(json.dumps(TextMergeConflict(conflict_block_start, conflict_block_end))))))
+                        details=base64.b64encode(
+                            pickle.dumps(
+                                json.dumps(
+                                    TextMergeConflict(
+                                        conflict_block_start, conflict_block_end
+                                    )
+                                )
+                            )
+                        ),
+                    )
+                )
 
         return conflicts

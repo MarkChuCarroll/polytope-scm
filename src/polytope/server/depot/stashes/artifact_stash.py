@@ -1,4 +1,4 @@
-# Copyright 2023 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,10 +20,10 @@ from polytope.common.error import ErrorKind, PtException
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion, VersionStatus
 from polytope.common.stashable.ids import Id, IdKind
 from polytope.common.stashable.user import Action, AuthenticatedUser
-from polytope.depot.depot import Depot
-from polytope.depot.stashes.stash import Stash
-from polytope.depot.stashes.user_stash import UserStash
-from polytope.depot.storage.storage import Content
+from polytope.server.depot import Depot
+from polytope.server.depot.stashes.stash import Stash
+from polytope.server.depot.stashes.user_stash import UserStash
+from polytope.server.depot.storage import Content
 
 
 class ArtifactStash(Stash):

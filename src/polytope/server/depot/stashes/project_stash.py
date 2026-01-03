@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,9 @@
 
 from datetime import datetime
 from typing import List, NamedTuple
+
 from pymongo.synchronous.cursor import Cursor
+
 from polytope.common.agents.baseline import Baseline
 from polytope.common.agents.directory import Directory
 from polytope.common.error import ErrorKind, PtException
@@ -23,19 +25,35 @@ from polytope.common.stashable.artifact import Artifact, ArtifactVersion
 from polytope.common.stashable.history import History
 from polytope.common.stashable.ids import Id
 from polytope.common.stashable.project import Project
-from polytope.common.stashable.pvs import PVSKind, ProjectVersionSpecifier
+from polytope.common.stashable.pvs import ProjectVersionSpecifier, PVSKind
+from polytope.common.stashable import JDict
 from polytope.common.stashable.user import Action
-from polytope.common.stashable.stashable import JDict
-from polytope.depot.depot import Depot
-from polytope.depot.stashes.stash import Stash
-from polytope.depot.stashes.user_stash import AuthenticatedUser, UserStash
-from polytope.depot.storage.storage import Content
+from polytope.server.depot import Depot
+from polytope.server.depot.stashes.stash import Stash
+from polytope.server.depot.stashes.user_stash import AuthenticatedUser, UserStash
+from polytope.server.depot.storage import Content
 
 
 class ProjectContents(NamedTuple):
     baseline: Artifact
-    rootDir: Artifact
+    root_dir: Artifact
     history: History
+
+    @classmethod
+    def from_dict(cls, d: JDict) -> "ProjectContents":
+        return ProjectContents(
+            baseline=Artifact.from_dict(d["baseline"]),
+            root_dir=Artifact.from_dict(d["root_dir"]),
+            history=History.from_dict(d["history"]),
+        )
+
+    def to_dict(self) -> JDict:
+        return {
+            "type": "ProjectContents",
+            "baseline": self.baseline.to_dict(),
+            "root_dir": self.root_dir.to_dict(),
+            "history": self.history.to_dict(),
+        }
 
 
 class ProjectStash(Stash):

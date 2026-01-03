@@ -1,4 +1,4 @@
-# Copyright 2025 Mark C. Chu-Carroll
+# Copyright 2026 Mark C. Chu-Carroll
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,11 +17,11 @@ import json
 import pickle
 from typing import Dict, List, NamedTuple
 
-from polytope.common.agents.agents import Agent, MergeConflict, MergeResult
+from polytope.common.agents import Agent, MergeConflict, MergeResult
 from polytope.common.error import ErrorKind, PtException
 from polytope.common.stashable.artifact import Artifact, ArtifactVersion
 from polytope.common.stashable.ids import Id, IdKind
-from polytope.common.stashable.stashable import JDict
+from polytope.common.stashable import JDict
 
 
 class Baseline(NamedTuple):
@@ -30,6 +30,7 @@ class Baseline(NamedTuple):
 
     def to_dict(self) -> JDict:
         return {
+            "type": "Baseline",
             "root_dir": str(self.root_dir),
             "entries": {str(k): str(v) for k, v in self.entries.items()},
         }
@@ -94,7 +95,6 @@ class BaselineConflict(NamedTuple):
 
 
 class BaselineAgent(Agent[Baseline]):
-
     def artifact_type(self) -> str:
         return "baseline"
 
